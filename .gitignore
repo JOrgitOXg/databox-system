@@ -1,0 +1,46 @@
+# Entorno de Python
+__pycache__/
+*.py[cod]
+*.sqlite3
+*.db
+.env
+*.env
+
+# Configuración de entornos virtuales
+venv/
+.env/
+*.env
+*.venv
+
+# Archivos de logs y caché
+*.log
+*.bak
+*.swp
+*.swo
+*.tmp
+
+# Configuración específica de IDEs
+.vscode/
+.idea/
+*.iml
+
+# Archivos de compilación
+*.out
+*.o
+*.a
+*.so
+
+# Archivos de dependencia
+*.lock
+
+# Archivos de Firebase
+firebase.json
+.firebaserc
+
+# Archivos estáticos generados
+/static/
+*.map
+
+# Archivos temporales y de sistema
+.DS_Store
+Thumbs.db
