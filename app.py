@@ -125,9 +125,25 @@ def create_survey():
     if request.method == 'POST':
         title = request.form.get('title')
         description = request.form.get('description')
-        questions = [q for q in request.form.getlist('questions[]') if q.strip()]
+        questions = request.form.getlist('questions[]')
+        question_types = request.form.getlist('question_types[]')
+        question_options = request.form.getlist('question_options[]')
         
-        if not questions:
+        # Procesar las preguntas
+        processed_questions = []
+        for i, (q_text, q_type) in enumerate(zip(questions, question_types)):
+            question_data = {
+                'text': q_text,
+                'type': q_type
+            }
+            
+            if q_type == 'multiple':
+                options = [opt.strip() for opt in question_options[i].split(',') if opt.strip()]
+                question_data['options'] = options
+            
+            processed_questions.append(question_data)
+        
+        if not processed_questions:
             flash('Debes agregar al menos una pregunta', 'error')
             return render_template('create_survey.html')
         
@@ -135,7 +151,7 @@ def create_survey():
             db.collection('surveys').add({
                 'title': title,
                 'description': description,
-                'questions': questions,
+                'questions': processed_questions,
                 'owner': session['user']['uid'],
                 'createdAt': datetime.now(),
                 'responses': 0
