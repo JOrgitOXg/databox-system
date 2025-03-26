@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}DataVox - Registro{% endblock %}
+
+{% block content %}
+<div class="h-screen bg-gradient-to-br from-gray-900 to-blue-900 flex items-center justify-center p-4">
+    <div class="bg-gray-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-gray-700">
+        <div class="p-8">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-blue-500 mb-3">Crear Cuenta</h1>
+                <p class="text-gray-400">Únete a DataVox hoy</p>
+            </div>
+
+            <form method="POST" class="space-y-5">
+                <input 
+                    type="text"
+                    name="fullName"
+                    placeholder="Nombre completo"
+                    class="w-full px-4 py-3 bg-gray-700 text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-300"
+                    required
+                />
+                <input 
+                    type="email"
+                    name="email"
+                    placeholder="Correo electrónico"
+                    class="w-full px-4 py-3 bg-gray-700 text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-300"
+                    required
+                />
+                <input 
+                    type="password"
+                    name="password"
+                    placeholder="Contraseña"
+                    class="w-full px-4 py-3 bg-gray-700 text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-300"
+                    required
+                />
+                <button
+                    type="submit"
+                    class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition duration-300 ease-in-out transform hover:-translate-y-1 shadow-lg hover:shadow-xl"
+                >
+                    Registrarse
+                </button>
+            </form>
+
+            <div class="mt-6 text-center text-sm text-gray-400">
+                <a href="{{ url_for('login') }}" class="hover:text-blue-500 transition">
+                    ¿Ya tienes cuenta? Inicia sesión
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
