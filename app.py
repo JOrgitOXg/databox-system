@@ -109,12 +109,25 @@ def dashboard():
         for survey in surveys_ref:
             survey_data = survey.to_dict()
             survey_data['id'] = survey.id
+            
+            # Obtener número real de respuestas
+            responses_count = len(list(db.collection('survey_responses')
+                                  .where('survey_id', '==', survey.id)
+                                  .stream()))
+            
+            # Usar el mayor entre el campo responses y el conteo real
+            survey_data['responses'] = max(responses_count, survey_data.get('responses', 0))
+            
             if 'createdAt' in survey_data:
-                if hasattr(survey_data['createdAt'], 'date'):
-                    survey_data['createdAt'] = survey_data['createdAt'].date().strftime('%d/%m/%Y')
+                if hasattr(survey_data['createdAt'], 'strftime'):
+                    survey_data['createdAt'] = survey_data['createdAt'].strftime('%d/%m/%Y')
                 else:
                     survey_data['createdAt'] = "Fecha no disponible"
+            
             surveys.append(survey_data)
+        
+        # Ordenar por fecha de creación (más reciente primero)
+        surveys.sort(key=lambda x: x.get('createdAt', ''), reverse=True)
         
         return render_template('dashboard.html', 
                             user_name=session['user']['name'],
@@ -134,16 +147,28 @@ def create_survey():
         question_types = request.form.getlist('question_types[]')
         question_options = request.form.getlist('question_options[]')
         
+        # Validaciones
+        if not title or len(title.strip()) < 3:
+            flash('El título debe tener al menos 3 caracteres', 'error')
+            return render_template('create_survey.html')
+            
         # Procesar las preguntas
         processed_questions = []
         for i, (q_text, q_type) in enumerate(zip(questions, question_types)):
+            if not q_text or len(q_text.strip()) < 5:
+                flash('Cada pregunta debe tener al menos 5 caracteres', 'error')
+                return render_template('create_survey.html')
+                
             question_data = {
-                'text': q_text,
+                'text': q_text.strip(),
                 'type': q_type
             }
             
             if q_type == 'multiple':
                 options = [opt.strip() for opt in question_options[i].split(',') if opt.strip()]
+                if len(options) < 2:
+                    flash('Las preguntas de opción múltiple deben tener al menos 2 opciones', 'error')
+                    return render_template('create_survey.html')
                 question_data['options'] = options
             
             processed_questions.append(question_data)
@@ -153,14 +178,18 @@ def create_survey():
             return render_template('create_survey.html')
         
         try:
-            db.collection('surveys').add({
-                'title': title,
-                'description': description,
+            # Crear encuesta con contador inicializado a 0
+            survey_data = {
+                'title': title.strip(),
+                'description': description.strip() if description else '',
                 'questions': processed_questions,
                 'owner': session['user']['uid'],
                 'createdAt': datetime.now(),
-                'responses': 0
-            })
+                'responses': 0,
+                'updatedAt': datetime.now()
+            }
+            
+            db.collection('surveys').add(survey_data)
             flash('Encuesta creada exitosamente', 'success')
             return redirect(url_for('dashboard'))
         except Exception as e:
@@ -168,7 +197,7 @@ def create_survey():
     
     return render_template('create_survey.html')
 
-# Ruta para editar una encuesta
+# Ruta para editar encuestas
 @app.route('/edit-survey/<survey_id>', methods=['GET', 'POST'])
 @login_required
 def edit_survey(survey_id):
@@ -190,16 +219,28 @@ def edit_survey(survey_id):
             question_types = request.form.getlist('question_types[]')
             question_options = request.form.getlist('question_options[]')
             
+            # Validaciones
+            if not title or len(title.strip()) < 3:
+                flash('El título debe tener al menos 3 caracteres', 'error')
+                return render_template('create_survey.html', survey=survey)
+                
             # Procesar las preguntas
             processed_questions = []
             for i, (q_text, q_type) in enumerate(zip(questions, question_types)):
+                if not q_text or len(q_text.strip()) < 5:
+                    flash('Cada pregunta debe tener al menos 5 caracteres', 'error')
+                    return render_template('create_survey.html', survey=survey)
+                    
                 question_data = {
-                    'text': q_text,
+                    'text': q_text.strip(),
                     'type': q_type
                 }
                 
                 if q_type == 'multiple':
                     options = [opt.strip() for opt in question_options[i].split(',') if opt.strip()]
+                    if len(options) < 2:
+                        flash('Las preguntas de opción múltiple deben tener al menos 2 opciones', 'error')
+                        return render_template('create_survey.html', survey=survey)
                     question_data['options'] = options
                 
                 processed_questions.append(question_data)
@@ -210,8 +251,8 @@ def edit_survey(survey_id):
             
             try:
                 survey_ref.update({
-                    'title': title,
-                    'description': description,
+                    'title': title.strip(),
+                    'description': description.strip() if description else '',
                     'questions': processed_questions,
                     'updatedAt': datetime.now()
                 })
@@ -225,7 +266,7 @@ def edit_survey(survey_id):
         flash(f'Error al cargar encuesta para edición: {str(e)}', 'error')
         return redirect(url_for('dashboard'))
 
-# Ruta para ver una encuesta
+# Ruta para ver encuesta
 @app.route('/survey/<survey_id>')
 @login_required
 def view_survey(survey_id):
@@ -233,25 +274,100 @@ def view_survey(survey_id):
         survey_ref = db.collection('surveys').document(survey_id)
         survey_doc = survey_ref.get()
         
-        if not survey_doc.exists or survey_doc.to_dict()['owner'] != session['user']['uid']:
-            flash('Encuesta no encontrada', 'error')
+        if not survey_doc.exists:
+            flash('La encuesta no existe', 'error')
             return redirect(url_for('dashboard'))
         
         survey = survey_doc.to_dict()
+        
+        # Verificar si el usuario es el dueño o si es pública
+        if survey['owner'] != session['user']['uid']:
+            flash('No tienes permiso para ver esta encuesta', 'error')
+            return redirect(url_for('dashboard'))
+        
         survey['id'] = survey_id
         
+        # Formatear fecha
         if 'createdAt' in survey:
             if hasattr(survey['createdAt'], 'strftime'):
                 survey['createdAt'] = survey['createdAt'].strftime('%d/%m/%Y a las %H:%M')
             else:
                 survey['createdAt'] = "Fecha no disponible"
         
-        return render_template('survey.html', survey=survey)
+        # Obtener estadísticas de respuestas
+        responses_ref = db.collection('survey_responses').where('survey_id', '==', survey_id).stream()
+        response_count = len(list(responses_ref))
+        
+        return render_template('survey.html', 
+                            survey=survey,
+                            response_count=response_count)
     except Exception as e:
         flash(f'Error al cargar encuesta: {str(e)}', 'error')
         return redirect(url_for('dashboard'))
 
-# Ruta para eliminar una encuesta
+# Ruta para enviar respuestas
+@app.route('/submit-survey/<survey_id>', methods=['POST'])
+@login_required
+def submit_survey(survey_id):
+    try:
+        # Verificar si la encuesta existe
+        survey_ref = db.collection('surveys').document(survey_id)
+        survey = survey_ref.get()
+        if not survey.exists:
+            flash('La encuesta no existe', 'error')
+            return redirect(url_for('dashboard'))
+
+        # Verificar si el usuario ya respondió
+        existing_response = db.collection('survey_responses') \
+                            .where('survey_id', '==', survey_id) \
+                            .where('user_id', '==', session['user']['uid']) \
+                            .limit(1) \
+                            .get()
+
+        if len(existing_response) > 0:
+            flash('Ya has respondido esta encuesta anteriormente', 'warning')
+            return redirect(url_for('dashboard'))
+
+        # Procesar respuestas
+        responses = []
+        for key, value in request.form.items():
+            if key.startswith('question_'):
+                question_num = key.split('_')[1]
+                responses.append({
+                    'question_number': int(question_num),
+                    'response': value
+                })
+
+        # Guardar respuestas
+        response_data = {
+            'survey_id': survey_id,
+            'user_id': session['user']['uid'],
+            'responses': responses,
+            'submitted_at': datetime.now(),
+            'user_name': session['user'].get('name', 'Anónimo')
+        }
+
+        db.collection('survey_responses').add(response_data)
+
+        # Actualizar contador de respuestas (transacción atómica)
+        def update_counter(transaction):
+            survey_snap = survey_ref.get(transaction=transaction)
+            current_count = survey_snap.get('responses', 0)
+            transaction.update(survey_ref, {
+                'responses': current_count + 1,
+                'updatedAt': datetime.now()
+            })
+
+        db.run_transaction(update_counter)
+
+        flash('¡Tus respuestas han sido registradas!', 'success')
+        return redirect(url_for('dashboard'))
+
+    except Exception as e:
+        flash(f'Error al procesar respuestas: {str(e)}', 'error')
+        return redirect(url_for('view_survey', survey_id=survey_id))
+
+# Ruta para eliminar encuesta
 @app.route('/delete-survey/<survey_id>', methods=['POST'])
 @login_required
 def delete_survey(survey_id):
@@ -263,78 +379,31 @@ def delete_survey(survey_id):
             flash('No tienes permiso para eliminar esta encuesta', 'error')
             return redirect(url_for('dashboard'))
         
-        # Primero eliminamos las respuestas asociadas
-        responses = db.collection('survey_responses')\
-                     .where('survey_id', '==', survey_id)\
+        # Eliminar respuestas asociadas
+        responses = db.collection('survey_responses') \
+                     .where('survey_id', '==', survey_id) \
                      .stream()
         
-        for response in responses:
-            response.reference.delete()
+        batch = db.batch()
+        deleted_count = 0
         
-        # Luego eliminamos la encuesta
+        for response in responses:
+            batch.delete(response.reference)
+            deleted_count += 1
+            if deleted_count % 400 == 0:  # Límite de operaciones por batch
+                batch.commit()
+                batch = db.batch()
+        
+        if deleted_count > 0:
+            batch.commit()
+        
+        # Eliminar la encuesta
         survey_ref.delete()
         
-        flash('Encuesta eliminada exitosamente', 'success')
+        flash(f'Encuesta eliminada correctamente (junto con {deleted_count} respuestas)', 'success')
         return redirect(url_for('dashboard'))
     except Exception as e:
         flash(f'Error al eliminar encuesta: {str(e)}', 'error')
-        return redirect(url_for('view_survey', survey_id=survey_id))
-
-# Ruta para enviar respuestas a una encuesta
-@app.route('/submit-survey/<survey_id>', methods=['POST'])
-@login_required
-def submit_survey(survey_id):
-    try:
-        # Obtener las respuestas del formulario
-        responses = request.form.to_dict()
-        
-        # Procesar las respuestas
-        processed_responses = []
-        for key, value in responses.items():
-            if key.startswith('question_'):
-                question_num = key.split('_')[1]
-                processed_responses.append({
-                    'question_number': question_num,
-                    'response': value
-                })
-        
-        # Verificar si el usuario ya respondió
-        responses_ref = db.collection('survey_responses')
-        existing_response = responses_ref.where('survey_id', '==', survey_id)\
-                                       .where('user_id', '==', session['user']['uid'])\
-                                       .limit(1)\
-                                       .get()
-        
-        if existing_response:
-            flash('Ya has respondido esta encuesta', 'warning')
-            return redirect(url_for('dashboard'))
-
-        # Guardar respuestas
-        responses_ref.add({
-            'survey_id': survey_id,
-            'user_id': session['user']['uid'],
-            'responses': processed_responses,
-            'submitted_at': datetime.now()
-        })
-
-        # Actualización transaccional del contador de respuestas
-        survey_ref = db.collection('surveys').document(survey_id)
-
-        # Iniciar una transacción para actualizar el contador de respuestas
-        transaction = db.transaction()
-        def update_counter(transaction):
-            snapshot = survey_ref.get(transaction=transaction)
-            current_responses = snapshot.get('responses', 0)
-            transaction.update(survey_ref, {'responses': current_responses + 1})
-
-        # Ejecutar la transacción
-        transaction.call(update_counter)
-
-        flash('¡Respuestas enviadas correctamente!', 'success')
-        return redirect(url_for('dashboard'))
-    
-    except Exception as e:
-        flash(f'Error al enviar respuestas: {str(e)}', 'error')
         return redirect(url_for('view_survey', survey_id=survey_id))
 
 # Ruta para cerrar sesión
