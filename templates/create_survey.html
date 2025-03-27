@@ -1,12 +1,14 @@
 {% extends "base.html" %}
 
-{% block title %}DataVox - Crear Encuesta{% endblock %}
+{% block title %}{% if survey %}Editar{% else %}Crear{% endif %} Encuesta - DataVox{% endblock %}
 
 {% block content %}
 <div class="bg-gradient-to-br from-gray-900 to-blue-900 text-white min-h-screen flex items-center justify-center p-4">
     <div class="bg-gray-800 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden border border-gray-700 p-8">
         <div class="text-center mb-8">
-            <h1 class="text-3xl font-bold text-blue-500 mb-3">Crear Nueva Encuesta</h1>
+            <h1 class="text-3xl font-bold text-blue-500 mb-3">
+                {% if survey %}Editar{% else %}Crear Nueva{% endif %} Encuesta
+            </h1>
             <p class="text-gray-400">Diseña tu encuesta personalizada</p>
         </div>
 
@@ -17,6 +19,7 @@
                     type="text"
                     name="title"
                     id="title"
+                    value="{{ survey.title if survey else '' }}"
                     class="w-full px-4 py-3 bg-gray-700 text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-300"
                     required
                 />
@@ -29,12 +32,50 @@
                     id="description"
                     rows="3"
                     class="w-full px-4 py-3 bg-gray-700 text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-300"
-                ></textarea>
+                >{{ survey.description if survey else '' }}</textarea>
             </div>
 
             <div id="questions-container">
                 <label class="block text-gray-300 mb-2">Preguntas</label>
                 <div class="space-y-4" id="questions-list">
+                    {% if survey %}
+                        {% for question in survey.questions %}
+                        <div class="question-item bg-gray-700 p-4 rounded-lg">
+                            <div class="flex items-center space-x-2 mb-3">
+                                <input 
+                                    type="text"
+                                    name="questions[]"
+                                    value="{{ question.text }}"
+                                    class="flex-1 px-4 py-3 bg-gray-600 text-white border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="Texto de la pregunta"
+                                    required
+                                />
+                                <button type="button" class="remove-question text-red-500 hover:text-red-400 px-2">
+                                    ✕
+                                </button>
+                            </div>
+                            <div class="mb-3">
+                                <label class="block text-gray-300 mb-2">Tipo de pregunta</label>
+                                <select name="question_types[]" class="w-full px-4 py-3 bg-gray-600 text-white border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 question-type-select">
+                                    <option value="open" {% if question.type == 'open' %}selected{% endif %}>Respuesta abierta</option>
+                                    <option value="multiple" {% if question.type == 'multiple' %}selected{% endif %}>Opción múltiple</option>
+                                    <option value="rating" {% if question.type == 'rating' %}selected{% endif %}>Valoración (1-5)</option>
+                                </select>
+                            </div>
+                            <div class="options-container {% if question.type != 'multiple' %}hidden{% endif %}">
+                                <label class="block text-gray-300 mb-2">Opciones (separadas por comas)</label>
+                                <input 
+                                    type="text"
+                                    name="question_options[]"
+                                    value="{% if question.type == 'multiple' %}{{ question.options|join(', ') }}{% endif %}"
+                                    class="w-full px-4 py-3 bg-gray-600 text-white border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="Ej: Opción 1, Opción 2, Opción 3"
+                                    {% if question.type == 'multiple' %}required{% endif %}
+                                />
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
                     <div class="question-item bg-gray-700 p-4 rounded-lg">
                         <div class="flex items-center space-x-2 mb-3">
                             <input 
@@ -50,7 +91,7 @@
                         </div>
                         <div class="mb-3">
                             <label class="block text-gray-300 mb-2">Tipo de pregunta</label>
-                            <select name="question_types[]" class="w-full px-4 py-3 bg-gray-600 text-white border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <select name="question_types[]" class="w-full px-4 py-3 bg-gray-600 text-white border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 question-type-select">
                                 <option value="open">Respuesta abierta</option>
                                 <option value="multiple">Opción múltiple</option>
                                 <option value="rating">Valoración (1-5)</option>
@@ -66,6 +107,7 @@
                             />
                         </div>
                     </div>
+                    {% endif %}
                 </div>
                 <button 
                     type="button"
@@ -87,7 +129,7 @@
                     type="submit"
                     class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-300 ease-in-out transform hover:-translate-y-1 shadow-lg hover:shadow-xl"
                 >
-                    Guardar Encuesta
+                    {% if survey %}Actualizar{% else %}Guardar{% endif %} Encuesta
                 </button>
             </div>
         </form>
@@ -107,6 +149,16 @@
                 optionsContainer.querySelector('input').removeAttribute('required');
             }
         }
+
+        // Inicializar los selects existentes para mostrar/ocultar opciones
+        document.querySelectorAll('.question-type-select').forEach(select => {
+            handleQuestionTypeChange(select);
+            
+            // Añadir evento change
+            select.addEventListener('change', function() {
+                handleQuestionTypeChange(this);
+            });
+        });
 
         // Añadir nueva pregunta
         document.getElementById('add-question').addEventListener('click', function() {
@@ -128,7 +180,7 @@
                 </div>
                 <div class="mb-3">
                     <label class="block text-gray-300 mb-2">Tipo de pregunta</label>
-                    <select name="question_types[]" class="w-full px-4 py-3 bg-gray-600 text-white border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <select name="question_types[]" class="w-full px-4 py-3 bg-gray-600 text-white border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 question-type-select">
                         <option value="open">Respuesta abierta</option>
                         <option value="multiple">Opción múltiple</option>
                         <option value="rating">Valoración (1-5)</option>
@@ -147,7 +199,7 @@
             questionsList.appendChild(newQuestion);
             
             // Añadir evento al nuevo select
-            const select = newQuestion.querySelector('select');
+            const select = newQuestion.querySelector('.question-type-select');
             select.addEventListener('change', function() {
                 handleQuestionTypeChange(this);
             });
@@ -159,13 +211,6 @@
                 } else {
                     alert('Debe haber al menos una pregunta');
                 }
-            });
-        });
-
-        // Añadir eventos a los selects existentes
-        document.querySelectorAll('select[name="question_types[]"]').forEach(select => {
-            select.addEventListener('change', function() {
-                handleQuestionTypeChange(this);
             });
         });
 

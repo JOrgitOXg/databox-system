@@ -19,43 +19,199 @@
     <!-- Contenido principal -->
     <div class="container mx-auto mt-24 px-4 py-8">
         <div class="bg-gray-800 rounded-xl shadow-lg p-8">
-            <h1 class="text-3xl font-bold text-blue-500 mb-2">{{ survey.title }}</h1>
-            <p class="text-gray-400 mb-6">{{ survey.description }}</p>
+            <!-- Encabezado con botones de acción -->
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h1 class="text-3xl font-bold text-blue-500 mb-2">{{ survey.title }}</h1>
+                    <p class="text-gray-400">{{ survey.description }}</p>
+                </div>
+                <div class="flex space-x-2">
+                    <a href="{{ url_for('edit_survey', survey_id=survey.id) }}" 
+                       class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition">
+                        Editar
+                    </a>
+                    <form action="{{ url_for('delete_survey', survey_id=survey.id) }}" method="POST" 
+                          onsubmit="return confirm('¿Estás seguro de que quieres eliminar esta encuesta?');">
+                        <button type="submit" 
+                                class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
+                            Eliminar
+                        </button>
+                    </form>
+                </div>
+            </div>
             
-            <div class="border-t border-gray-700 pt-6">
-                <h2 class="text-xl font-semibold mb-4">Preguntas:</h2>
-                <ul class="space-y-4">
-                    {% for question in survey.questions %}
-                    <li class="bg-gray-700 p-4 rounded-lg">
-                        <p class="text-white mb-2">{{ question.text }} <span class="text-gray-400 text-sm">({{ question.type }})</span></p>
-                        
-                        {% if question.type == 'open' %}
-                        <textarea class="w-full px-4 py-2 bg-gray-600 text-white border border-gray-500 rounded-lg"></textarea>
-                        {% elif question.type == 'multiple' %}
-                        <div class="space-y-2 mt-2">
-                            {% for option in question.options %}
-                            <div class="flex items-center">
-                                <input type="radio" id="option{{ loop.index }}" name="question{{ loop.index }}" class="mr-2">
-                                <label for="option{{ loop.index }}">{{ option }}</label>
+            <!-- Formulario de la encuesta -->
+            <form action="{{ url_for('submit_survey', survey_id=survey.id) }}" method="POST" id="survey-form">
+                <div class="border-t border-gray-700 pt-6">
+                    <h2 class="text-xl font-semibold mb-4">Preguntas:</h2>
+                    <ul class="space-y-6">
+                        {% for question in survey.questions %}
+                        <li class="bg-gray-700 p-4 rounded-lg">
+                            <p class="text-white mb-3 font-medium">{{ question.text }}</p>
+                            
+                            {% if question.type == 'open' %}
+                            <textarea 
+                                name="question_{{ loop.index }}" 
+                                class="w-full px-4 py-2 bg-gray-600 text-white border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                rows="3"
+                                required
+                            ></textarea>
+                            
+                            {% elif question.type == 'multiple' %}
+                            <div class="space-y-2 mt-2">
+                                {% for option in question.options %}
+                                <div class="flex items-center">
+                                    <input 
+                                        type="radio" 
+                                        id="question_{{ loop.index }}_{{ loop.index0 }}" 
+                                        name="question_{{ loop.index }}" 
+                                        value="{{ option }}"
+                                        class="mr-2 h-5 w-5 text-blue-600 focus:ring-blue-500"
+                                        onclick="handleRadioClick(this)"
+                                    >
+                                    <label for="question_{{ loop.index }}_{{ loop.index0 }}" class="cursor-pointer">
+                                        {{ option }}
+                                    </label>
+                                </div>
+                                {% endfor %}
                             </div>
-                            {% endfor %}
-                        </div>
-                        {% elif question.type == 'rating' %}
-                        <div class="flex space-x-2 mt-2">
-                            {% for i in range(1, 6) %}
-                            <button class="px-3 py-1 bg-gray-600 rounded hover:bg-blue-500">{{ i }}</button>
-                            {% endfor %}
-                        </div>
-                        {% endif %}
-                    </li>
-                    {% endfor %}
-                </ul>
-            </div>
-            
-            <div class="mt-8 text-sm text-gray-400">
-                <p>Creado el {{ survey.createdAt }}</p>
-            </div>
+                            
+                            {% elif question.type == 'rating' %}
+                            <div class="rating-buttons flex space-x-2 mt-2">
+                                {% for i in range(1, 6) %}
+                                <button 
+                                    type="button"
+                                    data-value="{{ i }}"
+                                    class="rating-btn px-4 py-2 bg-gray-600 rounded-lg hover:bg-blue-500 transition"
+                                >
+                                    {{ i }}
+                                </button>
+                                {% endfor %}
+                                <input type="hidden" name="question_{{ loop.index }}" value="" required>
+                            </div>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                
+                <div class="mt-8 flex justify-end">
+                    <button 
+                        type="submit"
+                        class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition duration-300"
+                    >
+                        Enviar Encuesta
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
+
+<script>
+    // Función para manejar el clic en radio buttons (selección/deselección)
+    function handleRadioClick(radio) {
+        if (radio.checked && radio.dataset.clicked === 'true') {
+            radio.checked = false;
+            radio.dataset.clicked = 'false';
+            return;
+        }
+        radio.dataset.clicked = 'true';
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Manejar los botones de rating
+        document.querySelectorAll('.rating-buttons').forEach(container => {
+            const buttons = container.querySelectorAll('.rating-btn');
+            const hiddenInput = container.querySelector('input[type="hidden"]');
+            
+            buttons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const value = this.dataset.value;
+                    const isSelected = this.classList.contains('bg-blue-600');
+                    
+                    // Deseleccionar todos
+                    buttons.forEach(btn => {
+                        btn.classList.remove('bg-blue-600', 'text-white');
+                        btn.classList.add('bg-gray-600');
+                    });
+                    
+                    // Toggle selección
+                    if (!isSelected) {
+                        this.classList.remove('bg-gray-600');
+                        this.classList.add('bg-blue-600', 'text-white');
+                        hiddenInput.value = value;
+                    } else {
+                        hiddenInput.value = '';
+                    }
+                });
+            });
+        });
+        
+        // Validación antes de enviar el formulario
+        document.getElementById('survey-form').addEventListener('submit', function(e) {
+            // Verificar preguntas de opción múltiple
+            document.querySelectorAll('input[type="radio"]').forEach(radio => {
+                const groupName = radio.name;
+                const isChecked = document.querySelector(`input[name="${groupName}"]:checked`);
+                if (!isChecked) {
+                    e.preventDefault();
+                    alert('Por favor responde todas las preguntas de opción múltiple');
+                    return;
+                }
+            });
+
+            // Verificar preguntas de rating
+            document.querySelectorAll('.rating-buttons input[type="hidden"]').forEach(input => {
+                if (input.value === '') {
+                    e.preventDefault();
+                    alert('Por favor responde todas las preguntas de valoración');
+                    return;
+                }
+            });
+        });
+    });
+</script>
+
+<style>
+    .rating-btn {
+        transition: all 0.2s ease;
+        min-width: 40px;
+        text-align: center;
+    }
+    .rating-btn:hover {
+        transform: translateY(-2px);
+    }
+    
+    /* Estilo para radio buttons personalizados */
+    input[type="radio"] {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        border: 2px solid #9CA3AF;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        outline: none;
+        cursor: pointer;
+        position: relative;
+    }
+    
+    input[type="radio"]:checked {
+        border-color: #3B82F6;
+        background-color: #3B82F6;
+    }
+    
+    input[type="radio"]:checked::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: white;
+    }
+</style>
 {% endblock %}
