@@ -2,6 +2,8 @@ from flask import Flask, render_template, redirect, url_for, request, flash, ses
 from datetime import datetime
 import firebase_admin
 from firebase_admin import credentials, auth, firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
+from google.cloud.firestore import Increment  # Importación añadida
 from config import Config
 
 app = Flask(__name__)
@@ -36,11 +38,34 @@ def login():
         password = request.form.get('password')
         try:
             user = auth.get_user_by_email(email)
+            
+            # Obtener datos del usuario de Firestore
+            user_ref = db.collection('users').where('email', '==', email).limit(1).get()
+            
+            if user_ref:
+                user_data = user_ref[0].to_dict()
+                full_name = user_data.get('fullName', user.email.split('@')[0])
+            else:
+                # Si no existe en Firestore, crear registro
+                full_name = user.email.split('@')[0]
+                db.collection('users').document(user.uid).set({
+                    'uid': user.uid,
+                    'email': user.email,
+                    'fullName': full_name,
+                    'createdAt': datetime.now()
+                })
+            
             session['user'] = {
                 'uid': user.uid,
                 'email': user.email,
-                'name': user.display_name or email.split('@')[0]
+                'name': full_name
             }
+            
+            # Actualizar lastLogin
+            db.collection('users').document(user.uid).update({
+                'lastLogin': datetime.now()
+            })
+            
             flash('Inicio de sesión exitoso', 'success')
             return redirect(url_for('dashboard'))
         except auth.UserNotFoundError:
@@ -57,30 +82,42 @@ def register():
         email = request.form.get('email')
         password = request.form.get('password')
         try:
-            user = auth.create_user(
-                email=email,
-                password=password,
-                display_name=full_name
-            )
-            
-            db.collection('users').document(user.uid).set({
-                'fullName': full_name,
-                'email': email,
-                'createdAt': datetime.now()
-            })
-            
-            session['user'] = {
-                'uid': user.uid,
-                'email': user.email,
-                'name': full_name
-            }
-            
-            flash('Registro exitoso', 'success')
-            return redirect(url_for('dashboard'))
-        except auth.EmailAlreadyExistsError:
+            # Verificar si el email ya existe
+            existing_users = auth.get_user_by_email(email)
             flash('Este email ya está registrado', 'error')
+            return redirect(url_for('register'))
+        except auth.UserNotFoundError:
+            try:
+                user = auth.create_user(
+                    email=email,
+                    password=password,
+                    display_name=full_name
+                )
+                
+                # Guardar en Firestore
+                user_data = {
+                    'uid': user.uid,
+                    'fullName': full_name,
+                    'email': email,
+                    'createdAt': datetime.now(),
+                    'lastLogin': datetime.now(),
+                    'lastLogout': None
+                }
+                
+                db.collection('users').document(user.uid).set(user_data)
+                
+                session['user'] = {
+                    'uid': user.uid,
+                    'email': user.email,
+                    'name': full_name
+                }
+                
+                flash('Registro exitoso', 'success')
+                return redirect(url_for('dashboard'))
+            except Exception as e:
+                flash(f'Error en el registro: {str(e)}', 'error')
         except Exception as e:
-            flash(f'Error en el registro: {str(e)}', 'error')
+            flash(f'Error: {str(e)}', 'error')
     return render_template('register.html')
 
 # Ruta de olvido de contraseña
@@ -103,21 +140,30 @@ def forgot_password():
 @login_required
 def dashboard():
     try:
-        surveys_ref = db.collection('surveys').where('owner', '==', session['user']['uid']).stream()
-        surveys = []
+        # Actualizar datos del usuario en sesión
+        user_ref = db.collection('users').document(session['user']['uid']).get()
+        if user_ref.exists:
+            user_data = user_ref.to_dict()
+            session['user']['name'] = user_data.get('fullName', session['user']['email'].split('@')[0])
         
+        surveys_ref = db.collection('surveys').where(
+            filter=FieldFilter('owner', '==', session['user']['uid'])
+        ).stream()
+        
+        surveys = []
         for survey in surveys_ref:
             survey_data = survey.to_dict()
             survey_data['id'] = survey.id
             
-            # Obtener número real de respuestas
-            responses_count = len(list(db.collection('survey_responses')
-                                  .where('survey_id', '==', survey.id)
-                                  .stream()))
+            # Obtener conteo de respuestas
+            responses_ref = db.collection('survey_responses').where(
+                filter=FieldFilter('survey_id', '==', survey.id)
+            ).stream()
+            response_count = len(list(responses_ref))
             
-            # Usar el mayor entre el campo responses y el conteo real
-            survey_data['responses'] = max(responses_count, survey_data.get('responses', 0))
+            survey_data['responses'] = response_count
             
+            # Formateo de fecha
             if 'createdAt' in survey_data:
                 if hasattr(survey_data['createdAt'], 'strftime'):
                     survey_data['createdAt'] = survey_data['createdAt'].strftime('%d/%m/%Y')
@@ -126,7 +172,7 @@ def dashboard():
             
             surveys.append(survey_data)
         
-        # Ordenar por fecha de creación (más reciente primero)
+        # Ordenar por fecha de creación
         surveys.sort(key=lambda x: x.get('createdAt', ''), reverse=True)
         
         return render_template('dashboard.html', 
@@ -146,13 +192,14 @@ def create_survey():
         questions = request.form.getlist('questions[]')
         question_types = request.form.getlist('question_types[]')
         question_options = request.form.getlist('question_options[]')
+        is_public = request.form.get('is_public') == 'on'
         
         # Validaciones
         if not title or len(title.strip()) < 3:
             flash('El título debe tener al menos 3 caracteres', 'error')
             return render_template('create_survey.html')
             
-        # Procesar las preguntas
+        # Procesar preguntas
         processed_questions = []
         for i, (q_text, q_type) in enumerate(zip(questions, question_types)):
             if not q_text or len(q_text.strip()) < 5:
@@ -178,7 +225,7 @@ def create_survey():
             return render_template('create_survey.html')
         
         try:
-            # Crear encuesta con contador inicializado a 0
+            # Crear encuesta
             survey_data = {
                 'title': title.strip(),
                 'description': description.strip() if description else '',
@@ -186,7 +233,8 @@ def create_survey():
                 'owner': session['user']['uid'],
                 'createdAt': datetime.now(),
                 'responses': 0,
-                'updatedAt': datetime.now()
+                'updatedAt': datetime.now(),
+                'is_public': is_public
             }
             
             db.collection('surveys').add(survey_data)
@@ -218,13 +266,14 @@ def edit_survey(survey_id):
             questions = request.form.getlist('questions[]')
             question_types = request.form.getlist('question_types[]')
             question_options = request.form.getlist('question_options[]')
+            is_public = request.form.get('is_public') == 'on'
             
             # Validaciones
             if not title or len(title.strip()) < 3:
                 flash('El título debe tener al menos 3 caracteres', 'error')
                 return render_template('create_survey.html', survey=survey)
                 
-            # Procesar las preguntas
+            # Procesar preguntas
             processed_questions = []
             for i, (q_text, q_type) in enumerate(zip(questions, question_types)):
                 if not q_text or len(q_text.strip()) < 5:
@@ -254,7 +303,8 @@ def edit_survey(survey_id):
                     'title': title.strip(),
                     'description': description.strip() if description else '',
                     'questions': processed_questions,
-                    'updatedAt': datetime.now()
+                    'updatedAt': datetime.now(),
+                    'is_public': is_public
                 })
                 flash('Encuesta actualizada exitosamente', 'success')
                 return redirect(url_for('view_survey', survey_id=survey_id))
@@ -280,49 +330,146 @@ def view_survey(survey_id):
         
         survey = survey_doc.to_dict()
         
-        # Verificar si el usuario es el dueño o si es pública
+        # Verificar permisos
         if survey['owner'] != session['user']['uid']:
             flash('No tienes permiso para ver esta encuesta', 'error')
             return redirect(url_for('dashboard'))
         
         survey['id'] = survey_id
         
-        # Formatear fecha
-        if 'createdAt' in survey:
-            if hasattr(survey['createdAt'], 'strftime'):
-                survey['createdAt'] = survey['createdAt'].strftime('%d/%m/%Y a las %H:%M')
-            else:
-                survey['createdAt'] = "Fecha no disponible"
+        # Obtener el conteo de respuestas
+        responses_ref = db.collection('survey_responses').where(
+            filter=FieldFilter('survey_id', '==', survey_id)
+        ).stream()
         
-        # Obtener estadísticas de respuestas
-        responses_ref = db.collection('survey_responses').where('survey_id', '==', survey_id).stream()
         response_count = len(list(responses_ref))
+        
+        # Obtener las respuestas para mostrar
+        responses_ref = db.collection('survey_responses').where(
+            filter=FieldFilter('survey_id', '==', survey_id)
+        ).stream()
+        
+        responses = []
+        for resp in responses_ref:
+            resp_data = resp.to_dict()
+            if resp_data.get('is_anonymous'):
+                resp_data['user_name'] = resp_data.get('user_info', {}).get('name', 'Anónimo')
+            else:
+                resp_data['user_name'] = resp_data.get('user_name', 'Usuario registrado')
+            
+            # Formatear fecha de respuesta
+            if 'submitted_at' in resp_data:
+                if hasattr(resp_data['submitted_at'], 'strftime'):
+                    resp_data['formatted_date'] = resp_data['submitted_at'].strftime('%d/%m/%Y %H:%M')
+                else:
+                    resp_data['formatted_date'] = str(resp_data['submitted_at'])
+            else:
+                resp_data['formatted_date'] = "Fecha no disponible"
+            
+            responses.append(resp_data)
         
         return render_template('survey.html', 
                             survey=survey,
+                            responses=responses,
                             response_count=response_count)
     except Exception as e:
         flash(f'Error al cargar encuesta: {str(e)}', 'error')
         return redirect(url_for('dashboard'))
 
-# Ruta para enviar respuestas
+# Ruta para encuesta pública
+@app.route('/public-survey/<survey_id>', methods=['GET', 'POST'])
+def public_survey(survey_id):
+    try:
+        survey_ref = db.collection('surveys').document(survey_id)
+        survey_doc = survey_ref.get()
+        
+        if not survey_doc.exists:
+            flash('La encuesta no existe', 'error')
+            return redirect(url_for('home'))
+        
+        survey = survey_doc.to_dict()
+        survey['id'] = survey_id
+        
+        # Verificar si es pública
+        if not survey.get('is_public', False):
+            flash('Esta encuesta no está disponible públicamente', 'error')
+            return redirect(url_for('home'))
+        
+        if request.method == 'POST':
+            # Procesar datos del usuario
+            user_name = request.form.get('user_name')
+            user_age = request.form.get('user_age')
+            user_city = request.form.get('user_city')
+            
+            if not user_name or not user_age or not user_city:
+                flash('Por favor completa todos tus datos personales', 'error')
+                return render_template('public_survey.html', survey=survey)
+            
+            # Procesar respuestas
+            responses = []
+            for key, value in request.form.items():
+                if key.startswith('question_'):
+                    question_num = int(key.split('_')[1])
+                    if not value:
+                        flash('Por favor responde todas las preguntas', 'error')
+                        return render_template('public_survey.html', survey=survey)
+                    responses.append({
+                        'question_number': question_num,
+                        'response': value
+                    })
+            
+            # Validar todas las preguntas respondidas
+            if len(responses) != len(survey.get('questions', [])):
+                flash('Por favor responde todas las preguntas', 'error')
+                return render_template('public_survey.html', survey=survey)
+            
+            # Guardar respuesta
+            response_data = {
+                'survey_id': survey_id,
+                'user_info': {
+                    'name': user_name,
+                    'age': user_age,
+                    'city': user_city
+                },
+                'responses': responses,
+                'submitted_at': datetime.now(),
+                'is_anonymous': True
+            }
+
+            db.collection('survey_responses').add(response_data)
+
+            # Actualizar contador con incremento atómico
+            survey_ref.update({
+                'responses': Increment(1),  # Sin el prefijo firestore.
+                'updatedAt': datetime.now()
+            })
+
+            flash('¡Gracias por responder nuestra encuesta!', 'success')
+            return redirect(url_for('home'))
+        
+        return render_template('public_survey.html', survey=survey)
+    except Exception as e:
+        flash(f'Error al cargar encuesta: {str(e)}', 'error')
+        return redirect(url_for('home'))
+
+# Ruta para enviar respuestas (usuarios registrados)
 @app.route('/submit-survey/<survey_id>', methods=['POST'])
 @login_required
 def submit_survey(survey_id):
     try:
-        # Verificar si la encuesta existe
         survey_ref = db.collection('surveys').document(survey_id)
         survey = survey_ref.get()
+        
         if not survey.exists:
             flash('La encuesta no existe', 'error')
             return redirect(url_for('dashboard'))
 
-        # Verificar si el usuario ya respondió
-        existing_response = db.collection('survey_responses') \
-                            .where('survey_id', '==', survey_id) \
-                            .where('user_id', '==', session['user']['uid']) \
-                            .limit(1) \
-                            .get()
+        # Verificar si ya respondió
+        existing_response = db.collection('survey_responses').where(
+            filter=FieldFilter('survey_id', '==', survey_id)
+        ).where(
+            filter=FieldFilter('user_id', '==', session['user']['uid'])
+        ).limit(1).get()
 
         if len(existing_response) > 0:
             flash('Ya has respondido esta encuesta anteriormente', 'warning')
@@ -332,33 +479,37 @@ def submit_survey(survey_id):
         responses = []
         for key, value in request.form.items():
             if key.startswith('question_'):
-                question_num = key.split('_')[1]
+                question_num = int(key.split('_')[1])
+                if not value:
+                    flash('Por favor responde todas las preguntas', 'error')
+                    return redirect(url_for('view_survey', survey_id=survey_id))
                 responses.append({
-                    'question_number': int(question_num),
+                    'question_number': question_num,
                     'response': value
                 })
 
-        # Guardar respuestas
+        # Validar todas las preguntas
+        survey_data = survey.to_dict()
+        if len(responses) != len(survey_data.get('questions', [])):
+            flash('Por favor responde todas las preguntas', 'error')
+            return redirect(url_for('view_survey', survey_id=survey_id))
+
+        # Guardar respuesta
         response_data = {
             'survey_id': survey_id,
             'user_id': session['user']['uid'],
             'responses': responses,
             'submitted_at': datetime.now(),
-            'user_name': session['user'].get('name', 'Anónimo')
+            'user_name': session['user'].get('name', 'Usuario registrado')
         }
 
         db.collection('survey_responses').add(response_data)
 
-        # Actualizar contador de respuestas (transacción atómica)
-        def update_counter(transaction):
-            survey_snap = survey_ref.get(transaction=transaction)
-            current_count = survey_snap.get('responses', 0)
-            transaction.update(survey_ref, {
-                'responses': current_count + 1,
-                'updatedAt': datetime.now()
-            })
-
-        db.run_transaction(update_counter)
+        # Actualizar contador con incremento atómico
+        survey_ref.update({
+            'responses': Increment(1),  # Sin el prefijo firestore.
+            'updatedAt': datetime.now()
+        })
 
         flash('¡Tus respuestas han sido registradas!', 'success')
         return redirect(url_for('dashboard'))
@@ -380,9 +531,9 @@ def delete_survey(survey_id):
             return redirect(url_for('dashboard'))
         
         # Eliminar respuestas asociadas
-        responses = db.collection('survey_responses') \
-                     .where('survey_id', '==', survey_id) \
-                     .stream()
+        responses = db.collection('survey_responses').where(
+            filter=FieldFilter('survey_id', '==', survey_id)
+        ).stream()
         
         batch = db.batch()
         deleted_count = 0
@@ -397,7 +548,7 @@ def delete_survey(survey_id):
         if deleted_count > 0:
             batch.commit()
         
-        # Eliminar la encuesta
+        # Eliminar encuesta
         survey_ref.delete()
         
         flash(f'Encuesta eliminada correctamente (junto con {deleted_count} respuestas)', 'success')
@@ -411,6 +562,7 @@ def delete_survey(survey_id):
 def logout():
     try:
         if 'user' in session:
+            # Actualizar lastLogout
             db.collection('users').document(session['user']['uid']).update({
                 'lastLogout': datetime.now()
             })

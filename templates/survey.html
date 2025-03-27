@@ -18,7 +18,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
-                    {{ survey.responses }} respuestas
+                    {{ response_count }} respuestas
                 </span>
                 <div class="flex space-x-2">
                     <a href="{{ url_for('edit_survey', survey_id=survey.id) }}" 
@@ -28,8 +28,39 @@
                         </svg>
                         Editar
                     </a>
+                    {% if survey.is_public %}
+                    <div class="relative group">
+                        <button 
+                            class="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm flex items-center share-btn"
+                            data-url="{{ url_for('public_survey', survey_id=survey.id, _external=True) }}"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                            </svg>
+                            Compartir
+                        </button>
+                        <div class="absolute hidden group-hover:block bg-gray-700 p-2 rounded-lg shadow-lg z-10 w-64">
+                            <p class="text-xs text-gray-300 mb-2">Comparte este enlace para que otros respondan:</p>
+                            <div class="flex">
+                                <input 
+                                    type="text" 
+                                    value="{{ url_for('public_survey', survey_id=survey.id, _external=True) }}" 
+                                    class="flex-1 px-2 py-1 bg-gray-600 text-white text-xs rounded-l border border-gray-500 focus:outline-none" 
+                                    id="share-link-{{ survey.id }}"
+                                    readonly
+                                >
+                                <button 
+                                    class="bg-blue-500 text-white px-2 py-1 text-xs rounded-r hover:bg-blue-600 copy-btn"
+                                    data-target="share-link-{{ survey.id }}"
+                                >
+                                    Copiar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
                     <form action="{{ url_for('delete_survey', survey_id=survey.id) }}" method="POST" 
-                          onsubmit="return confirm('¿Estás seguro de eliminar esta encuesta y sus {{ survey.responses }} respuestas?');">
+                          onsubmit="return confirm('¿Estás seguro de eliminar esta encuesta y sus {{ response_count }} respuestas?');">
                         <button type="submit" 
                                 class="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm flex items-center">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -126,6 +157,47 @@
                     </button>
                 </div>
             </form>
+
+            <!-- Sección de respuestas -->
+            {% if responses %}
+            <div class="mt-12 border-t border-gray-700 pt-6">
+                <h2 class="text-xl font-semibold mb-4">Respuestas ({{ responses|length }})</h2>
+                <div class="space-y-4">
+                    {% for response in responses %}
+                    <div class="bg-gray-700 p-4 rounded-lg">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="font-medium text-blue-400">
+                                {{ response.user_name }}
+                            </span>
+                            <span class="text-xs text-gray-400">
+                                {% if response.submitted_at %}
+                                    {% if response.submitted_at is string %}
+                                        {{ response.submitted_at }}
+                                    {% else %}
+                                        {{ response.submitted_at.strftime('%d/%m/%Y %H:%M') }}
+                                    {% endif %}
+                                {% else %}
+                                    Fecha no disponible
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="space-y-2 mt-2">
+                            {% for answer in response.responses %}
+                            <div>
+                                <p class="text-sm text-gray-300">
+                                    <span class="font-medium">{{ survey.questions[answer.question_number-1].text }}</span>
+                                </p>
+                                <p class="text-white mt-1">
+                                    {{ answer.response }}
+                                </p>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -194,6 +266,23 @@
                     alert('Por favor responde todas las preguntas de valoración');
                     return;
                 }
+            });
+        });
+
+        // Manejar copiado de enlace
+        document.querySelectorAll('.copy-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const targetId = this.getAttribute('data-target');
+                const input = document.getElementById(targetId);
+                input.select();
+                document.execCommand('copy');
+                
+                // Cambiar texto temporalmente
+                const originalText = this.textContent;
+                this.textContent = '¡Copiado!';
+                setTimeout(() => {
+                    this.textContent = originalText;
+                }, 2000);
             });
         });
     });

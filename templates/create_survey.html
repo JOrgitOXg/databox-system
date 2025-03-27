@@ -105,8 +105,8 @@
                                 class="w-full px-4 py-3 bg-gray-600 text-white border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 placeholder="Ej: Opción 1, Opción 2, Opción 3"
                             />
+                            </div>
                         </div>
-                    </div>
                     {% endif %}
                 </div>
                 <button 
@@ -116,6 +116,19 @@
                 >
                     + Añadir otra pregunta
                 </button>
+            </div>
+
+            <div class="flex items-center mt-6">
+                <input 
+                    type="checkbox" 
+                    name="is_public" 
+                    id="is_public" 
+                    class="h-5 w-5 text-blue-600 rounded focus:ring-blue-500"
+                    {% if survey and survey.get('is_public') %}checked{% endif %}
+                >
+                <label for="is_public" class="ml-2 text-gray-300">
+                    Hacer esta encuesta pública (cualquiera con el enlace puede responder)
+                </label>
             </div>
 
             <div class="flex justify-end space-x-4 pt-4">
