@@ -9,6 +9,17 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+<!-- Agrega esto en el head -->
+<style>
+    .header-container {
+        height: 64px; /* Altura fija para todos los headers */
+        padding: 0 1rem;
+    }
+    .header-title {
+        font-size: 1.5rem; /* Tamaño consistente para títulos */
+    }
+</style>
+
 </head>
 <body class="font-['Inter']">
     {% with messages = get_flashed_messages(with_categories=true) %}
