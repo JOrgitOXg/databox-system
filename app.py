@@ -571,6 +571,8 @@ def survey_stats(survey_id):
             return redirect(url_for('dashboard'))
 
         survey = survey_doc.to_dict()
+        survey['id'] = survey_id  # ← Esto es crítico para que funcione survey.id en la plantilla
+
         
         # 2. Obtener respuestas con manejo seguro de datos
         responses = []
