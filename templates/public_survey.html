@@ -65,22 +65,17 @@
                     ></textarea>
                     
                     {% elif question.type == 'multiple' %}
-                    <div class="space-y-2 mt-2">
+                    <div class="space-y-3 mt-2">
                         {% for option in question.options %}
-                        <div class="flex items-center">
-                            <input 
-                                type="radio" 
-                                id="question_{{ loop.index }}_{{ loop.index0 }}" 
-                                name="question_{{ loop.index }}" 
-                                value="{{ option }}"
-                                class="mr-2 h-5 w-5 text-blue-600 focus:ring-blue-500"
-                                required
-                            >
-                            <label for="question_{{ loop.index }}_{{ loop.index0 }}" class="cursor-pointer">
-                                {{ option }}
-                            </label>
+                        <div class="flex items-center cursor-pointer option-container" data-value="{{ option }}">
+                            <!-- Botón circular personalizado -->
+                            <div class="option-radio w-5 h-5 rounded-full border-2 border-gray-400 flex items-center justify-center mr-3 transition-all duration-200">
+                                <div class="option-dot w-3 h-3 rounded-full bg-transparent transition-all duration-200"></div>
+                            </div>
+                            <label class="cursor-pointer text-gray-300 hover:text-white transition-colors">{{ option }}</label>
                         </div>
                         {% endfor %}
+                        <input type="hidden" name="question_{{ loop.index }}" value="" required>
                     </div>
                     
                     {% elif question.type == 'rating' %}
@@ -113,6 +108,38 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // Manejar los botones circulares personalizados para opción múltiple
+        document.querySelectorAll('.option-container').forEach(container => {
+            container.addEventListener('click', function() {
+                const value = this.getAttribute('data-value');
+                const questionContainer = this.closest('.space-y-3');
+                const hiddenInput = questionContainer.querySelector('input[type="hidden"]');
+                const radio = this.querySelector('.option-radio');
+                const dot = this.querySelector('.option-dot');
+                const label = this.querySelector('label');
+                
+                // Verificar si ya está seleccionado
+                const isSelected = radio.classList.contains('border-blue-600');
+                
+                // Deseleccionar todos en el grupo primero
+                questionContainer.querySelectorAll('.option-container').forEach(opt => {
+                    opt.querySelector('.option-radio').classList.remove('border-blue-600', 'bg-blue-600/10');
+                    opt.querySelector('.option-dot').classList.remove('bg-blue-600');
+                    opt.querySelector('label').classList.remove('text-white');
+                });
+                
+                // Alternar selección
+                if (!isSelected) {
+                    radio.classList.add('border-blue-600', 'bg-blue-600/10');
+                    dot.classList.add('bg-blue-600');
+                    label.classList.add('text-white');
+                    hiddenInput.value = value;
+                } else {
+                    hiddenInput.value = '';
+                }
+            });
+        });
+
         // Manejar los botones de rating
         document.querySelectorAll('.rating-buttons').forEach(container => {
             const buttons = container.querySelectorAll('.rating-btn');
@@ -143,6 +170,15 @@
 
         // Validación antes de enviar el formulario
         document.querySelector('form').addEventListener('submit', function(e) {
+            // Verificar preguntas de opción múltiple
+            document.querySelectorAll('.space-y-3 input[type="hidden"]').forEach(input => {
+                if (input.value === '') {
+                    e.preventDefault();
+                    alert('Por favor responde todas las preguntas de opción múltiple');
+                    return;
+                }
+            });
+
             // Verificar preguntas de rating
             document.querySelectorAll('.rating-buttons input[type="hidden"]').forEach(input => {
                 if (input.value === '') {
@@ -156,6 +192,29 @@
 </script>
 
 <style>
+    /* Estilos para los botones circulares personalizados */
+    .option-radio {
+        transition: all 0.2s ease;
+    }
+    .option-radio:hover {
+        border-color: #2563eb;
+        background-color: rgba(37, 99, 235, 0.1);
+    }
+    .option-radio.border-blue-600 {
+        border-color: #2563eb;
+        background-color: rgba(37, 99, 235, 0.1);
+    }
+    .option-dot.bg-blue-600 {
+        background-color: #2563eb;
+    }
+    .option-container:hover .option-radio {
+        border-color: #2563eb;
+    }
+    .option-container:hover label {
+        color: white;
+    }
+
+    /* Estilos para los botones de rating */
     .rating-btn {
         transition: all 0.2s ease;
         min-width: 40px;
@@ -165,9 +224,8 @@
         transform: translateY(-2px);
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     }
-    
     .rating-btn.bg-blue-600 {
-        background-color: #3B82F6;
+        background-color: #2563eb;
         color: white;
     }
 </style>

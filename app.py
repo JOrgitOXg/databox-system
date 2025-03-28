@@ -1,3 +1,4 @@
+import re
 from flask import Flask, render_template, redirect, url_for, request, flash, session
 from datetime import datetime
 import firebase_admin
@@ -555,6 +556,123 @@ def delete_survey(survey_id):
         return redirect(url_for('dashboard'))
     except Exception as e:
         flash(f'Error al eliminar encuesta: {str(e)}', 'error')
+        return redirect(url_for('view_survey', survey_id=survey_id))
+
+# Ruta para estadisticas de la encuesta
+@app.route('/survey-stats/<survey_id>')
+@login_required
+def survey_stats(survey_id):
+    try:
+        # 1. Obtener la encuesta con verificación de propiedad
+        survey_ref = db.collection('surveys').document(survey_id)
+        survey_doc = survey_ref.get()
+        if not survey_doc.exists or survey_doc.to_dict().get('owner') != session['user']['uid']:
+            flash('Acceso no autorizado', 'error')
+            return redirect(url_for('dashboard'))
+
+        survey = survey_doc.to_dict()
+        
+        # 2. Obtener respuestas con manejo seguro de datos
+        responses = []
+        for resp in db.collection('survey_responses').where('survey_id', '==', survey_id).stream():
+            resp_data = resp.to_dict()
+            # Limpieza de datos
+            clean_responses = []
+            for answer in resp_data.get('responses', []):
+                clean_answer = {
+                    'question_number': int(answer.get('question_number', 0)),
+                    'response': str(answer.get('response', ''))
+                }
+                clean_responses.append(clean_answer)
+            
+            resp_data['responses'] = clean_responses
+            responses.append(resp_data)
+
+        if not responses:
+            flash('No hay respuestas suficientes', 'warning')
+            return redirect(url_for('view_survey', survey_id=survey_id))
+
+        # 3. Procesamiento estadístico seguro
+        stats = {'questions': []}
+        
+        for i, question in enumerate(survey.get('questions', [])):
+            q_data = {
+                'text': str(question.get('text', '')),
+                'type': str(question.get('type', '')),
+                'stats': None
+            }
+
+            # Preguntas de opción múltiple
+            if question['type'] == 'multiple':
+                options = [str(opt) for opt in question.get('options', [])]
+                counts = {opt: 0 for opt in options}
+                
+                for resp in responses:
+                    for ans in resp['responses']:
+                        if ans['question_number'] == i+1 and ans['response'] in counts:
+                            counts[ans['response']] += 1
+                
+                q_data['stats'] = {
+                    'type': 'bar',
+                    'labels': list(counts.keys()),
+                    'data': list(counts.values())
+                }
+
+            # Preguntas de rating
+            elif question['type'] == 'rating':
+                ratings = [0] * 5
+                for resp in responses:
+                    for ans in resp['responses']:
+                        if ans['question_number'] == i+1:
+                            try:
+                                rating = int(float(ans['response']))
+                                if 1 <= rating <= 5:
+                                    ratings[rating-1] += 1
+                            except (ValueError, TypeError):
+                                continue
+                
+                q_data['stats'] = {
+                    'type': 'bar',
+                    'labels': ['1', '2', '3', '4', '5'],
+                    'data': ratings
+                }
+
+            # Preguntas abiertas (versión simplificada)
+            elif question['type'] == 'open':
+                word_counts = {}
+                for resp in responses:
+                    for ans in resp['responses']:
+                        if ans['question_number'] == i+1:
+                            words = re.findall(r'\b\w{4,}\b', ans['response'].lower())  # Palabras de 4+ letras
+                            for word in words:
+                                word_counts[word] = word_counts.get(word, 0) + 1
+                
+                if word_counts:
+                    top_words = sorted(word_counts.items(), key=lambda x: x[1], reverse=True)[:7]
+                    q_data['stats'] = {
+                        'type': 'pie',
+                        'labels': [w[0] for w in top_words],
+                        'data': [w[1] for w in top_words]
+                    }
+
+            stats['questions'].append(q_data)
+
+        # 4. Validación final de datos
+        import json
+        try:
+            json.dumps(stats)  # Prueba de serialización
+        except TypeError as e:
+            print(f"Datos no serializables: {e}")
+            raise
+
+        return render_template('survey_stats.html',
+                            survey=survey,
+                            stats=stats,
+                            response_count=len(responses))
+
+    except Exception as e:
+        print(f"Error en survey_stats: {str(e)}")
+        flash('Error al procesar estadísticas', 'error')
         return redirect(url_for('view_survey', survey_id=survey_id))
 
 # Ruta para cerrar sesión
