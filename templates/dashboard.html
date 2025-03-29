@@ -7,7 +7,11 @@
     <!-- Barra de navegación superior -->
     <div class="bg-blue-600 p-0 fixed top-0 left-0 w-full z-10 header-container">
         <div class="container mx-auto flex justify-between items-center h-full">
-            <h1 class="text-2xl font-bold text-white header-title">DataVox</h1>
+            <a href="{{ url_for('dashboard') }}" class="flex items-center">
+                <img src="{{ url_for('static', filename='images/datavox-version-final-blanco.svg') }}" 
+                     alt="DataVox Logo" 
+                     class="h-14 mr-2">
+            </a>
             <a href="{{ url_for('logout') }}" class="text-white bg-red-500 px-4 py-2 rounded-lg hover:bg-red-600 transition duration-300 h-10 flex items-center">
                 Cerrar sesión
             </a>
@@ -56,9 +60,9 @@
             </div>
             {% else %}
             <div class="bg-gray-700 rounded-lg p-8 text-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
+                <img src="{{ url_for('static', filename='images/logo.svg') }}" 
+                     alt="DataVox Logo" 
+                     class="h-12 mx-auto mb-4 opacity-50">
                 <h4 class="text-xl text-gray-300 mt-4">No tienes encuestas creadas</h4>
                 <p class="text-gray-500 mt-2">Crea tu primera encuesta haciendo clic en el botón superior</p>
             </div>

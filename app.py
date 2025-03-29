@@ -137,7 +137,7 @@ def forgot_password():
     return render_template('forgot_password.html')
 
 # Ruta del dashboard
-@app.route('/dashboard')
+@app.route('/dashboard', methods=['GET'])  # Solo GET
 @login_required
 def dashboard():
     try:
@@ -251,70 +251,100 @@ def create_survey():
 @login_required
 def edit_survey(survey_id):
     try:
+        # 1. Verificar permisos y obtener encuesta
         survey_ref = db.collection('surveys').document(survey_id)
         survey_doc = survey_ref.get()
         
-        if not survey_doc.exists or survey_doc.to_dict()['owner'] != session['user']['uid']:
+        if not survey_doc.exists:
+            flash('La encuesta no existe', 'error')
+            return redirect(url_for('dashboard'))
+        
+        survey_data = survey_doc.to_dict()
+        if survey_data['owner'] != session['user']['uid']:
             flash('No tienes permiso para editar esta encuesta', 'error')
             return redirect(url_for('dashboard'))
         
-        survey = survey_doc.to_dict()
-        survey['id'] = survey_id
-        
+        # 2. Preparar datos para el template
+        survey = {
+            'id': survey_id,
+            'title': survey_data.get('title', ''),
+            'description': survey_data.get('description', ''),
+            'questions': survey_data.get('questions', []),
+            'is_public': survey_data.get('is_public', False)
+        }
+
+        # 3. Procesar POST
         if request.method == 'POST':
-            title = request.form.get('title')
-            description = request.form.get('description')
-            questions = request.form.getlist('questions[]')
-            question_types = request.form.getlist('question_types[]')
-            question_options = request.form.getlist('question_options[]')
-            is_public = request.form.get('is_public') == 'on'
-            
-            # Validaciones
-            if not title or len(title.strip()) < 3:
+            # Obtener datos del formulario
+            form_data = {
+                'title': request.form.get('title', '').strip(),
+                'description': request.form.get('description', '').strip(),
+                'is_public': request.form.get('is_public') == 'on',
+                'questions': [],
+                'question_types': request.form.getlist('question_types[]'),
+                'question_options': request.form.getlist('question_options[]')
+            }
+
+            # Validación básica
+            if len(form_data['title']) < 3:
                 flash('El título debe tener al menos 3 caracteres', 'error')
+                survey.update(form_data)  # Mantener los cambios del usuario
                 return render_template('create_survey.html', survey=survey)
-                
+
             # Procesar preguntas
-            processed_questions = []
-            for i, (q_text, q_type) in enumerate(zip(questions, question_types)):
-                if not q_text or len(q_text.strip()) < 5:
-                    flash('Cada pregunta debe tener al menos 5 caracteres', 'error')
-                    return render_template('create_survey.html', survey=survey)
+            try:
+                questions_text = request.form.getlist('questions[]')
+                for i, (q_text, q_type) in enumerate(zip(questions_text, form_data['question_types'])):
+                    q_text = q_text.strip()
+                    if len(q_text) < 5:
+                        flash(f'La pregunta {i+1} debe tener al menos 5 caracteres', 'error')
+                        raise ValueError('Pregunta muy corta')
                     
-                question_data = {
-                    'text': q_text.strip(),
-                    'type': q_type
+                    question = {
+                        'text': q_text,
+                        'type': q_type
+                    }
+                    
+                    if q_type == 'multiple':
+                        options = [opt.strip() for opt in form_data['question_options'][i].split(',') if opt.strip()]
+                        if len(options) < 2:
+                            flash(f'La pregunta {i+1} (opción múltiple) debe tener al menos 2 opciones', 'error')
+                            raise ValueError('Opciones insuficientes')
+                        question['options'] = options
+                    
+                    form_data['questions'].append(question)
+                
+                if not form_data['questions']:
+                    flash('Debe haber al menos una pregunta', 'error')
+                    raise ValueError('Sin preguntas')
+                
+                # Actualizar en Firestore
+                update_data = {
+                    'title': form_data['title'],
+                    'description': form_data['description'],
+                    'questions': form_data['questions'],
+                    'is_public': form_data['is_public'],
+                    'updatedAt': datetime.now()
                 }
                 
-                if q_type == 'multiple':
-                    options = [opt.strip() for opt in question_options[i].split(',') if opt.strip()]
-                    if len(options) < 2:
-                        flash('Las preguntas de opción múltiple deben tener al menos 2 opciones', 'error')
-                        return render_template('create_survey.html', survey=survey)
-                    question_data['options'] = options
-                
-                processed_questions.append(question_data)
-            
-            if not processed_questions:
-                flash('Debes agregar al menos una pregunta', 'error')
-                return render_template('create_survey.html', survey=survey)
-            
-            try:
-                survey_ref.update({
-                    'title': title.strip(),
-                    'description': description.strip() if description else '',
-                    'questions': processed_questions,
-                    'updatedAt': datetime.now(),
-                    'is_public': is_public
-                })
-                flash('Encuesta actualizada exitosamente', 'success')
+                survey_ref.update(update_data)
+                flash('Encuesta actualizada correctamente', 'success')
                 return redirect(url_for('view_survey', survey_id=survey_id))
+                
             except Exception as e:
-                flash(f'Error al actualizar encuesta: {str(e)}', 'error')
+                survey.update({
+                    'title': form_data['title'],
+                    'description': form_data['description'],
+                    'questions': form_data['questions'],
+                    'is_public': form_data['is_public']
+                })
+                return render_template('create_survey.html', survey=survey)
         
+        # 4. Mostrar formulario (GET)
         return render_template('create_survey.html', survey=survey)
+        
     except Exception as e:
-        flash(f'Error al cargar encuesta para edición: {str(e)}', 'error')
+        flash(f'Error inesperado: {str(e)}', 'error')
         return redirect(url_for('dashboard'))
 
 # Ruta para ver encuesta
@@ -445,8 +475,8 @@ def public_survey(survey_id):
                 'updatedAt': datetime.now()
             })
 
-            flash('¡Gracias por responder nuestra encuesta!', 'success')
-            return redirect(url_for('home'))
+            return render_template('thank_you.html')
+
         
         return render_template('public_survey.html', survey=survey)
     except Exception as e:
@@ -513,7 +543,7 @@ def submit_survey(survey_id):
         })
 
         flash('¡Tus respuestas han sido registradas!', 'success')
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('view_survey', survey_id=survey_id))  # Cambia dashboard por view_survey
 
     except Exception as e:
         flash(f'Error al procesar respuestas: {str(e)}', 'error')
