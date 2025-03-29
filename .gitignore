@@ -38,8 +38,8 @@ firebase.json
 .firebaserc
 
 # Archivos estáticos generados
-/static/
-*.map
+#/static/
+#*.map
 
 # Archivos temporales y de sistema
 .DS_Store
