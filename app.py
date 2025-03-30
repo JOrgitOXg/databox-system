@@ -6,6 +6,9 @@ from firebase_admin import credentials, auth, firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 from google.cloud.firestore import Increment  # Importación añadida
 from config import Config
+from firebase_admin import auth
+import requests
+import json
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -15,6 +18,10 @@ app.secret_key = Config.SECRET_KEY
 cred = credentials.Certificate("serviceAccountKey.json")
 firebase_admin.initialize_app(cred)
 db = firestore.client()
+
+# Configuración para el envío de correos (añade esto después de inicializar Firebase)
+FIREBASE_WEB_API_KEY = "AIzaSyAWePs8l11z6KMrPfg-VbUK9KVrlcieczs"  # Usa tu API key de Firebase
+RESET_PASSWORD_URL = "https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode"
 
 # Función para requerir inicio de sesión
 def login_required(f):
@@ -37,8 +44,43 @@ def login():
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
+        
+        if not email or not password:
+            flash('Por favor ingresa tanto el email como la contraseña', 'error')
+            return redirect(url_for('login'))
+        
         try:
-            user = auth.get_user_by_email(email)
+            # Autenticar con Firebase
+            firebase_auth_url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={FIREBASE_WEB_API_KEY}"
+            auth_payload = {
+                "email": email,
+                "password": password,
+                "returnSecureToken": True
+            }
+            
+            response = requests.post(firebase_auth_url, json=auth_payload)
+            response_data = response.json()
+            
+            if response.status_code != 200:
+                error_msg = response_data.get('error', {}).get('message', 'Error desconocido')
+                
+                # Mapeo de errores de Firebase a mensajes personalizados
+                error_messages = {
+                    "EMAIL_NOT_FOUND": "No existe una cuenta con este email",
+                    "INVALID_PASSWORD": "Contraseña incorrecta",
+                    "USER_DISABLED": "Esta cuenta ha sido deshabilitada",
+                    "TOO_MANY_ATTEMPTS_TRY_LATER": "Demasiados intentos fallidos. Intenta más tarde",
+                    "INVALID_EMAIL": "El formato del email no es válido"
+                }
+                
+                # Obtener mensaje personalizado o usar el predeterminado
+                flash_message = error_messages.get(error_msg, "Error al iniciar sesión. Por favor intenta nuevamente")
+                flash(flash_message, 'error')
+                return redirect(url_for('login'))
+            
+            # Si la autenticación fue exitosa
+            user_id = response_data.get('localId')
+            user = auth.get_user(user_id)
             
             # Obtener datos del usuario de Firestore
             user_ref = db.collection('users').where('email', '==', email).limit(1).get()
@@ -69,10 +111,11 @@ def login():
             
             flash('Inicio de sesión exitoso', 'success')
             return redirect(url_for('dashboard'))
-        except auth.UserNotFoundError:
-            flash('Usuario no encontrado', 'error')
+            
         except Exception as e:
-            flash(f'Error al iniciar sesión: {str(e)}', 'error')
+            flash('Ocurrió un error inesperado al iniciar sesión', 'error')
+            return redirect(url_for('login'))
+    
     return render_template('index.html')
 
 # Ruta de registro
@@ -122,19 +165,101 @@ def register():
     return render_template('register.html')
 
 # Ruta de olvido de contraseña
+# Modifica la ruta de forgot_password
 @app.route('/forgot-password', methods=['GET', 'POST'])
 def forgot_password():
     if request.method == 'POST':
         email = request.form.get('email')
         try:
-            auth.generate_password_reset_link(email)
-            flash('Se ha enviado un correo con instrucciones', 'success')
+            # Verificar si el email existe
+            auth.get_user_by_email(email)
+            
+            # Configurar la solicitud para enviar el correo de restablecimiento
+            payload = {
+                'requestType': 'PASSWORD_RESET',
+                'email': email
+            }
+            
+            # Parámetros de la solicitud
+            params = {
+                'key': FIREBASE_WEB_API_KEY
+            }
+            
+            # Enviar la solicitud a Firebase
+            response = requests.post(RESET_PASSWORD_URL, params=params, json=payload)
+            
+            # Verificar si hubo errores
+            if response.status_code != 200:
+                error_data = response.json()
+                flash(f'Error al enviar el correo: {error_data.get("error", {}).get("message", "Error desconocido")}', 'error')
+                return redirect(url_for('forgot_password'))
+            
+            flash('Se ha enviado un correo con instrucciones para restablecer tu contraseña', 'success')
             return redirect(url_for('login'))
+            
         except auth.UserNotFoundError:
             flash('No existe una cuenta con este email', 'error')
         except Exception as e:
             flash(f'Error: {str(e)}', 'error')
     return render_template('forgot_password.html')
+
+# Añade esta nueva ruta para el formulario de restablecimiento
+@app.route('/reset-password', methods=['GET', 'POST'])
+def reset_password():
+    if request.method == 'POST':
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
+        oob_code = request.form.get('oobCode')  # Este código viene en el enlace del correo
+        
+        # Validaciones básicas
+        if not new_password or not confirm_password:
+            flash('Por favor completa todos los campos', 'error')
+            return render_template('reset_password.html', oobCode=oob_code)
+            
+        if new_password != confirm_password:
+            flash('Las contraseñas no coinciden', 'error')
+            return render_template('reset_password.html', oobCode=oob_code)
+            
+        if len(new_password) < 6:
+            flash('La contraseña debe tener al menos 6 caracteres', 'error')
+            return render_template('reset_password.html', oobCode=oob_code)
+            
+        try:
+            # Configurar la solicitud para restablecer la contraseña
+            payload = {
+                'oobCode': oob_code,
+                'newPassword': new_password
+            }
+            
+            # Parámetros de la solicitud
+            params = {
+                'key': FIREBASE_WEB_API_KEY
+            }
+            
+            # Enviar la solicitud a Firebase
+            reset_url = "https://identitytoolkit.googleapis.com/v1/accounts:resetPassword"
+            response = requests.post(reset_url, params=params, json=payload)
+            
+            # Verificar si hubo errores
+            if response.status_code != 200:
+                error_data = response.json()
+                flash(f'Error al restablecer la contraseña: {error_data.get("error", {}).get("message", "Error desconocido")}', 'error')
+                return render_template('reset_password.html', oobCode=oob_code)
+            
+            flash('Tu contraseña ha sido restablecida correctamente. Ahora puedes iniciar sesión.', 'success')
+            return redirect(url_for('login'))
+            
+        except Exception as e:
+            flash(f'Error al restablecer la contraseña: {str(e)}', 'error')
+            return render_template('reset_password.html', oobCode=oob_code)
+    
+    # Para GET, mostrar el formulario con el código
+    oob_code = request.args.get('oobCode')
+    if not oob_code:
+        flash('El enlace de restablecimiento no es válido', 'error')
+        return redirect(url_for('forgot_password'))
+        
+    return render_template('reset_password.html', oobCode=oob_code)
 
 # Ruta del dashboard
 @app.route('/dashboard', methods=['GET'])  # Solo GET
@@ -391,7 +516,7 @@ def view_survey(survey_id):
             # Formatear fecha de respuesta
             if 'submitted_at' in resp_data:
                 if hasattr(resp_data['submitted_at'], 'strftime'):
-                    resp_data['formatted_date'] = resp_data['submitted_at'].strftime('%d/%m/%Y %H:%M')
+                    resp_data['formatted_date'] = resp_data['submitted_at'].strftime('%d/%m/%Y %H:%M:%S')
                 else:
                     resp_data['formatted_date'] = str(resp_data['submitted_at'])
             else:
@@ -504,7 +629,7 @@ def submit_survey(survey_id):
 
         if len(existing_response) > 0:
             flash('Ya has respondido esta encuesta anteriormente', 'warning')
-            return redirect(url_for('dashboard'))
+            return redirect(url_for('view_survey', survey_id=survey_id))
 
         # Procesar respuestas
         responses = []

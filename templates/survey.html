@@ -74,16 +74,15 @@
                         </svg>
                         Ver Estadísticas
                     </a>
-                    <form action="{{ url_for('delete_survey', survey_id=survey.id) }}" method="POST" 
-                          onsubmit="return confirm('¿Estás seguro de eliminar esta encuesta y sus {{ response_count }} respuestas?');">
-                        <button type="submit" 
-                                class="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm flex items-center h-8">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                            Eliminar
-                        </button>
-                    </form>
+                    <button 
+                        onclick="confirmDelete('{{ survey.id }}', {{ response_count }})"
+                        class="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm flex items-center h-8"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Eliminar
+                    </button>
                 </div>
             </div>
         </div>
@@ -183,7 +182,7 @@
                                     {% if response.submitted_at is string %}
                                         {{ response.submitted_at }}
                                     {% else %}
-                                        {{ response.submitted_at.strftime('%d/%m/%Y %H:%M') }}
+                                        {{ response.submitted_at.strftime('%d/%m/%Y %H:%M:%S') }}
                                     {% endif %}
                                 {% else %}
                                     Fecha no disponible

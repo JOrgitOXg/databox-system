@@ -12,9 +12,9 @@
                      alt="DataVox Logo" 
                      class="h-14 mr-2">
             </a>
-            <a href="{{ url_for('logout') }}" class="text-white bg-red-500 px-4 py-2 rounded-lg hover:bg-red-600 transition duration-300 h-10 flex items-center">
+            <button onclick="confirmLogout()" class="text-white bg-red-500 px-4 py-2 rounded-lg hover:bg-red-600 transition duration-300 h-10 flex items-center">
                 Cerrar sesión
-            </a>
+            </button>
         </div>
     </div>
 
@@ -22,7 +22,7 @@
     <div class="container mx-auto mt-24 px-4 py-8">
         <!-- Header con nombre de usuario -->
         <div class="py-6 border-b border-gray-700 flex justify-between items-center">
-            <h1 class="text-4xl font-bold text-blue-500">Bienvenido, <span class="text-blue-400">{{ user_name }}</span></h1>
+            <h1 class="text-4xl font-bold text-blue-500">Bienvenid@, <span class="text-blue-400">{{ user_name }}</span></h1>
             <a 
                 href="{{ url_for('create_survey') }}"
                 class="bg-blue-600 text-white py-3 px-6 rounded-lg shadow-lg hover:bg-blue-700 transition duration-300 ease-in-out transform hover:-translate-y-1"
@@ -60,7 +60,7 @@
             </div>
             {% else %}
             <div class="bg-gray-700 rounded-lg p-8 text-center">
-                <img src="{{ url_for('static', filename='images/logo.svg') }}" 
+                <img src="{{ url_for('static', filename='images/datavox-version-final-blanco.svg') }}" 
                      alt="DataVox Logo" 
                      class="h-12 mx-auto mb-4 opacity-50">
                 <h4 class="text-xl text-gray-300 mt-4">No tienes encuestas creadas</h4>
