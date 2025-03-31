@@ -7,3 +7,5 @@ class Config:
     FIREBASE_APP_ID = "1:1049619916095:web:c3b646fd9832ee2fd39f8a"
     FIREBASE_MEASUREMENT_ID = "G-ZHV2PJ7S2G"
     FIREBASE_DATABASE_URL = "https://databox-d3cfe-default-rtdb.firebaseio.com/"
+    SECRET_KEY = "tu_clave_secreta_flask_aqui"  # Cambiar esto por una clave secreta real
+    
