@@ -34,8 +34,6 @@ pip install -r requirements.txt
 
 pip install grpcio==1.56.2 --only-binary=:all: #SI FALLA TODA LA INSTALACION ANTERIOR PRIMERO INSTALAR ESTO
 
-python -c "from firebase_admin import firestore; print('Firestore funciona!')" # Verifica que Firestore funcione correctamente
-
 pip install --upgrade --force-reinstall -r requirements.txt # Reinstala todas las dependencias para asegurarse de que estén actualizadas y en la versión correcta
 
 pip uninstall protobuf # Desinstala protobuf si ya está instalado

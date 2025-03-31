@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="bg-gradient-to-br from-gray-900 to-blue-900 text-white min-h-screen flex flex-col">
-    <!-- Barra de navegación superior mejorada -->
+    <!-- Barra de header -->
     <div class="bg-blue-600 p-0 fixed top-0 left-0 w-full z-10 header-container">
         <div class="container mx-auto flex justify-between items-center h-full">
             <div class="flex items-center space-x-4">
@@ -27,7 +27,6 @@
     <!-- Contenido principal -->
     <div class="container mx-auto mt-24 px-4 py-8">
         <div class="bg-gray-800 rounded-xl shadow-lg p-8">
-            <!-- Encabezado -->
             <div class="mb-8 text-center">
                 <h1 class="text-3xl font-bold text-blue-500 mb-2">Estadísticas: {{ survey.title }}</h1>
                 <p class="text-gray-400">{{ survey.description }}</p>
@@ -82,12 +81,11 @@
     </div>
 </div>
 
-<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Configuración común para todos los gráficos
+    // Configuración para todos los gráficos
     const chartConfig = {
         responsive: true,
         maintainAspectRatio: false,

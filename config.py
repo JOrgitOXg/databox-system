@@ -6,4 +6,4 @@ class Config:
     FIREBASE_MESSAGING_SENDER_ID = "1049619916095"
     FIREBASE_APP_ID = "1:1049619916095:web:c3b646fd9832ee2fd39f8a"
     FIREBASE_MEASUREMENT_ID = "G-ZHV2PJ7S2G"
-    SECRET_KEY = "tu_clave_secreta_flask_aqui"  # Cambia esto por una clave secreta fuerte
+    FIREBASE_DATABASE_URL = "https://databox-d3cfe-default-rtdb.firebaseio.com/"

@@ -19,8 +19,8 @@ cred = credentials.Certificate("serviceAccountKey.json")
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
-# Configuración para el envío de correos (añade esto después de inicializar Firebase)
-FIREBASE_WEB_API_KEY = "AIzaSyAWePs8l11z6KMrPfg-VbUK9KVrlcieczs"  # Usa tu API key de Firebase
+# Configuración para el envío de correos
+FIREBASE_WEB_API_KEY = "AIzaSyAWePs8l11z6KMrPfg-VbUK9KVrlcieczs"
 RESET_PASSWORD_URL = "https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode"
 
 # Función para requerir inicio de sesión
@@ -73,7 +73,6 @@ def login():
                     "INVALID_EMAIL": "El formato del email no es válido"
                 }
                 
-                # Obtener mensaje personalizado o usar el predeterminado
                 flash_message = error_messages.get(error_msg, "Error al iniciar sesión. Por favor intenta nuevamente")
                 flash(flash_message, 'error')
                 return redirect(url_for('login'))
@@ -165,7 +164,6 @@ def register():
     return render_template('register.html')
 
 # Ruta de olvido de contraseña
-# Modifica la ruta de forgot_password
 @app.route('/forgot-password', methods=['GET', 'POST'])
 def forgot_password():
     if request.method == 'POST':
@@ -203,15 +201,14 @@ def forgot_password():
             flash(f'Error: {str(e)}', 'error')
     return render_template('forgot_password.html')
 
-# Añade esta nueva ruta para el formulario de restablecimiento
+#Función para resetear contraseña
 @app.route('/reset-password', methods=['GET', 'POST'])
 def reset_password():
     if request.method == 'POST':
         new_password = request.form.get('new_password')
         confirm_password = request.form.get('confirm_password')
-        oob_code = request.form.get('oobCode')  # Este código viene en el enlace del correo
+        oob_code = request.form.get('oobCode')
         
-        # Validaciones básicas
         if not new_password or not confirm_password:
             flash('Por favor completa todos los campos', 'error')
             return render_template('reset_password.html', oobCode=oob_code)
@@ -253,7 +250,6 @@ def reset_password():
             flash(f'Error al restablecer la contraseña: {str(e)}', 'error')
             return render_template('reset_password.html', oobCode=oob_code)
     
-    # Para GET, mostrar el formulario con el código
     oob_code = request.args.get('oobCode')
     if not oob_code:
         flash('El enlace de restablecimiento no es válido', 'error')
@@ -262,7 +258,7 @@ def reset_password():
     return render_template('reset_password.html', oobCode=oob_code)
 
 # Ruta del dashboard
-@app.route('/dashboard', methods=['GET'])  # Solo GET
+@app.route('/dashboard', methods=['GET'])
 @login_required
 def dashboard():
     try:
@@ -289,7 +285,6 @@ def dashboard():
             
             survey_data['responses'] = response_count
             
-            # Formateo de fecha
             if 'createdAt' in survey_data:
                 if hasattr(survey_data['createdAt'], 'strftime'):
                     survey_data['createdAt'] = survey_data['createdAt'].strftime('%d/%m/%Y')
@@ -320,7 +315,6 @@ def create_survey():
         question_options = request.form.getlist('question_options[]')
         is_public = request.form.get('is_public') == 'on'
         
-        # Validaciones
         if not title or len(title.strip()) < 3:
             flash('El título debe tener al menos 3 caracteres', 'error')
             return render_template('create_survey.html')
@@ -376,7 +370,7 @@ def create_survey():
 @login_required
 def edit_survey(survey_id):
     try:
-        # 1. Verificar permisos y obtener encuesta
+        # Verificar permisos y obtener encuesta
         survey_ref = db.collection('surveys').document(survey_id)
         survey_doc = survey_ref.get()
         
@@ -389,7 +383,7 @@ def edit_survey(survey_id):
             flash('No tienes permiso para editar esta encuesta', 'error')
             return redirect(url_for('dashboard'))
         
-        # 2. Preparar datos para el template
+        # Preparar datos para el template
         survey = {
             'id': survey_id,
             'title': survey_data.get('title', ''),
@@ -398,7 +392,6 @@ def edit_survey(survey_id):
             'is_public': survey_data.get('is_public', False)
         }
 
-        # 3. Procesar POST
         if request.method == 'POST':
             # Obtener datos del formulario
             form_data = {
@@ -410,10 +403,9 @@ def edit_survey(survey_id):
                 'question_options': request.form.getlist('question_options[]')
             }
 
-            # Validación básica
             if len(form_data['title']) < 3:
                 flash('El título debe tener al menos 3 caracteres', 'error')
-                survey.update(form_data)  # Mantener los cambios del usuario
+                survey.update(form_data)
                 return render_template('create_survey.html', survey=survey)
 
             # Procesar preguntas
@@ -465,7 +457,6 @@ def edit_survey(survey_id):
                 })
                 return render_template('create_survey.html', survey=survey)
         
-        # 4. Mostrar formulario (GET)
         return render_template('create_survey.html', survey=survey)
         
     except Exception as e:
@@ -513,7 +504,6 @@ def view_survey(survey_id):
             else:
                 resp_data['user_name'] = resp_data.get('user_name', 'Usuario registrado')
             
-            # Formatear fecha de respuesta
             if 'submitted_at' in resp_data:
                 if hasattr(resp_data['submitted_at'], 'strftime'):
                     resp_data['formatted_date'] = resp_data['submitted_at'].strftime('%d/%m/%Y %H:%M:%S')
@@ -596,7 +586,7 @@ def public_survey(survey_id):
 
             # Actualizar contador con incremento atómico
             survey_ref.update({
-                'responses': Increment(1),  # Sin el prefijo firestore.
+                'responses': Increment(1),
                 'updatedAt': datetime.now()
             })
 
@@ -663,12 +653,12 @@ def submit_survey(survey_id):
 
         # Actualizar contador con incremento atómico
         survey_ref.update({
-            'responses': Increment(1),  # Sin el prefijo firestore.
+            'responses': Increment(1),
             'updatedAt': datetime.now()
         })
 
         flash('¡Tus respuestas han sido registradas!', 'success')
-        return redirect(url_for('view_survey', survey_id=survey_id))  # Cambia dashboard por view_survey
+        return redirect(url_for('view_survey', survey_id=survey_id))
 
     except Exception as e:
         flash(f'Error al procesar respuestas: {str(e)}', 'error')
@@ -697,7 +687,7 @@ def delete_survey(survey_id):
         for response in responses:
             batch.delete(response.reference)
             deleted_count += 1
-            if deleted_count % 400 == 0:  # Límite de operaciones por batch
+            if deleted_count % 400 == 0:
                 batch.commit()
                 batch = db.batch()
         
@@ -718,7 +708,7 @@ def delete_survey(survey_id):
 @login_required
 def survey_stats(survey_id):
     try:
-        # 1. Obtener la encuesta con verificación de propiedad
+        # Obtener la encuesta con verificación de propiedad
         survey_ref = db.collection('surveys').document(survey_id)
         survey_doc = survey_ref.get()
         if not survey_doc.exists or survey_doc.to_dict().get('owner') != session['user']['uid']:
@@ -726,10 +716,10 @@ def survey_stats(survey_id):
             return redirect(url_for('dashboard'))
 
         survey = survey_doc.to_dict()
-        survey['id'] = survey_id  # ← Esto es crítico para que funcione survey.id en la plantilla
+        survey['id'] = survey_id
 
         
-        # 2. Obtener respuestas con manejo seguro de datos
+        # Obtener respuestas con manejo seguro de datos
         responses = []
         for resp in db.collection('survey_responses').where('survey_id', '==', survey_id).stream():
             resp_data = resp.to_dict()
@@ -749,7 +739,7 @@ def survey_stats(survey_id):
             flash('No hay respuestas suficientes', 'warning')
             return redirect(url_for('view_survey', survey_id=survey_id))
 
-        # 3. Procesamiento estadístico seguro
+        # Procesamiento estadístico
         stats = {'questions': []}
         
         for i, question in enumerate(survey.get('questions', [])):
@@ -794,7 +784,7 @@ def survey_stats(survey_id):
                     'data': ratings
                 }
 
-            # Preguntas abiertas (versión simplificada)
+            # Preguntas abiertas
             elif question['type'] == 'open':
                 word_counts = {}
                 for resp in responses:
@@ -814,7 +804,7 @@ def survey_stats(survey_id):
 
             stats['questions'].append(q_data)
 
-        # 4. Validación final de datos
+        # Validación final de datos
         import json
         try:
             json.dumps(stats)  # Prueba de serialización
