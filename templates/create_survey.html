@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+
+{% block title %}{% if survey %}Editar{% else %}Crear{% endif %} Encuesta - DataVox{% endblock %}
+
+{% block content %}
+<div class="bg-gradient-to-br from-gray-900 to-blue-900 text-white min-h-screen flex items-center justify-center p-4">
+    <div class="bg-gray-800 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden border border-gray-700 p-8">
+        <div class="text-center mb-8">
+            <a href="{{ url_for('dashboard') }}" class="inline-block mb-4">
+                <img src="{{ url_for('static', filename='images/datavox-version-final-azul.svg') }}" 
+                     alt="DataVox Logo" 
+                     class="h-24 mx-auto">
+            </a>
+            <h1 class="text-3xl font-bold text-blue-500 mb-3">
+                {% if survey %}Editar{% else %}Crear Nueva{% endif %} Encuesta
+            </h1>
+            <p class="text-gray-400">Diseña tu encuesta personalizada</p>
+        </div>
+
+        <form method="POST" action="{{ url_for('edit_survey', survey_id=survey.id) if survey else url_for('create_survey') }}">            <div>
+                <label for="title" class="block text-gray-300 mb-2">Título de la encuesta</label>
+                <input 
+                    type="text"
+                    name="title"
+                    id="title"
+                    value="{{ survey.title if survey else '' }}"
+                    class="w-full px-4 py-3 bg-gray-700 text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-300"
+                    required
+                />
+            </div>
+
+            <div>
+                <label for="description" class="block text-gray-300 mb-2">Descripción</label>
+                <textarea 
+                    name="description"
+                    id="description"
+                    rows="3"
+                    class="w-full px-4 py-3 bg-gray-700 text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-300"
+                >{{ survey.description if survey else '' }}</textarea>
+            </div>
+
+            <div id="questions-container">
+                <label class="block text-gray-300 mb-2">Preguntas</label>
+                <div class="space-y-4" id="questions-list">
+                    {% if survey %}
+                        {% for question in survey.questions %}
+                        <div class="question-item bg-gray-700 p-4 rounded-lg">
+                            <div class="flex items-center space-x-2 mb-3">
+                                <input 
+                                    type="text"
+                                    name="questions[]"
+                                    value="{{ question.text }}"
+                                    class="flex-1 px-4 py-3 bg-gray-600 text-white border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="Texto de la pregunta"
+                                    required
+                                />
+                                <button type="button" class="remove-question text-red-500 hover:text-red-400 px-2">
+                                    ✕
+                                </button>
+                            </div>
+                            <div class="mb-3">
+                                <label class="block text-gray-300 mb-2">Tipo de pregunta</label>
+                                <select name="question_types[]" class="w-full px-4 py-3 bg-gray-600 text-white border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 question-type-select">
+                                    <option value="open" {% if question.type == 'open' %}selected{% endif %}>Respuesta abierta</option>
+                                    <option value="multiple" {% if question.type == 'multiple' %}selected{% endif %}>Opción múltiple</option>
+                                    <option value="rating" {% if question.type == 'rating' %}selected{% endif %}>Valoración (1-5)</option>
+                                </select>
+                            </div>
+                            <div class="options-container {% if question.type != 'multiple' %}hidden{% endif %}">
+                                <label class="block text-gray-300 mb-2">Opciones (separadas por comas)</label>
+                                <input 
+                                    type="text"
+                                    name="question_options[]"
+                                    value="{% if question.type == 'multiple' %}{{ question.options|join(', ') }}{% endif %}"
+                                    class="w-full px-4 py-3 bg-gray-600 text-white border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="Ej: Opción 1, Opción 2, Opción 3"
+                                    {% if question.type == 'multiple' %}required{% endif %}
+                                />
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                    <div class="question-item bg-gray-700 p-4 rounded-lg">
+                        <div class="flex items-center space-x-2 mb-3">
+                            <input 
+                                type="text"
+                                name="questions[]"
+                                class="flex-1 px-4 py-3 bg-gray-600 text-white border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="Texto de la pregunta"
+                                required
+                            />
+                            <button type="button" class="remove-question text-red-500 hover:text-red-400 px-2">
+                                ✕
+                            </button>
+                        </div>
+                        <div class="mb-3">
+                            <label class="block text-gray-300 mb-2">Tipo de pregunta</label>
+                            <select name="question_types[]" class="w-full px-4 py-3 bg-gray-600 text-white border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 question-type-select">
+                                <option value="open">Respuesta abierta</option>
+                                <option value="multiple">Opción múltiple</option>
+                                <option value="rating">Valoración (1-5)</option>
+                            </select>
+                        </div>
+                        <div class="options-container hidden">
+                            <label class="block text-gray-300 mb-2">Opciones (separadas por comas)</label>
+                            <input 
+                                type="text"
+                                name="question_options[]"
+                                class="w-full px-4 py-3 bg-gray-600 text-white border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="Ej: Opción 1, Opción 2, Opción 3"
+                            />
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+                <button 
+                    type="button"
+                    id="add-question"
+                    class="mt-2 text-blue-400 hover:text-blue-300 text-sm flex items-center"
+                >
+                    + Añadir otra pregunta
+                </button>
+            </div>
+
+            <div class="flex items-center mt-6">
+                <input 
+                    type="checkbox" 
+                    name="is_public" 
+                    id="is_public" 
+                    class="h-5 w-5 text-blue-600 rounded focus:ring-blue-500"
+                    {% if survey and survey.get('is_public') %}checked{% endif %}
+                >
+                <label for="is_public" class="ml-2 text-gray-300">
+                    Hacer esta encuesta pública (cualquiera con el enlace puede responder)
+                </label>
+            </div>
+
+            <div class="flex justify-end space-x-4 pt-4">
+                <a 
+                href="{{ url_for('view_survey', survey_id=survey.id) if survey else url_for('dashboard') }}"
+                class="px-6 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-700 transition"
+            >
+                Cancelar
+            </a>
+                <button
+                    type="submit"
+                    class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-300 ease-in-out transform hover:-translate-y-1 shadow-lg hover:shadow-xl"
+                >
+                    {% if survey %}Actualizar{% else %}Guardar{% endif %} Encuesta
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Función para manejar el cambio de tipo de pregunta
+        function handleQuestionTypeChange(selectElement) {
+            const optionsContainer = selectElement.closest('.question-item').querySelector('.options-container');
+            if (selectElement.value === 'multiple') {
+                optionsContainer.classList.remove('hidden');
+                optionsContainer.querySelector('input').setAttribute('required', '');
+            } else {
+                optionsContainer.classList.add('hidden');
+                optionsContainer.querySelector('input').removeAttribute('required');
+            }
+        }
+
+        // Inicializar los selects existentes para mostrar/ocultar opciones
+        document.querySelectorAll('.question-type-select').forEach(select => {
+            handleQuestionTypeChange(select);
+            
+            // Añadir evento change
+            select.addEventListener('change', function() {
+                handleQuestionTypeChange(this);
+            });
+        });
+
+        // Añadir nueva pregunta
+        document.getElementById('add-question').addEventListener('click', function() {
+            const questionsList = document.getElementById('questions-list');
+            const newQuestion = document.createElement('div');
+            newQuestion.className = 'question-item bg-gray-700 p-4 rounded-lg';
+            newQuestion.innerHTML = `
+                <div class="flex items-center space-x-2 mb-3">
+                    <input 
+                        type="text"
+                        name="questions[]"
+                        class="flex-1 px-4 py-3 bg-gray-600 text-white border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Texto de la pregunta"
+                        required
+                    />
+                    <button type="button" class="remove-question text-red-500 hover:text-red-400 px-2">
+                        ✕
+                    </button>
+                </div>
+                <div class="mb-3">
+                    <label class="block text-gray-300 mb-2">Tipo de pregunta</label>
+                    <select name="question_types[]" class="w-full px-4 py-3 bg-gray-600 text-white border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 question-type-select">
+                        <option value="open">Respuesta abierta</option>
+                        <option value="multiple">Opción múltiple</option>
+                        <option value="rating">Valoración (1-5)</option>
+                    </select>
+                </div>
+                <div class="options-container hidden">
+                    <label class="block text-gray-300 mb-2">Opciones (separadas por comas)</label>
+                    <input 
+                        type="text"
+                        name="question_options[]"
+                        class="w-full px-4 py-3 bg-gray-600 text-white border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Ej: Opción 1, Opción 2, Opción 3"
+                    />
+                </div>
+            `;
+            questionsList.appendChild(newQuestion);
+            
+            // Añadir evento al nuevo select
+            const select = newQuestion.querySelector('.question-type-select');
+            select.addEventListener('change', function() {
+                handleQuestionTypeChange(this);
+            });
+            
+            // Añadir evento al botón de eliminar
+            newQuestion.querySelector('.remove-question').addEventListener('click', function() {
+                if (document.querySelectorAll('.question-item').length > 1) {
+                    this.closest('.question-item').remove();
+                } else {
+                    alert('Debe haber al menos una pregunta');
+                }
+            });
+        });
+
+        // Añadir eventos a los botones de eliminar existentes
+        document.querySelectorAll('.remove-question').forEach(button => {
+            button.addEventListener('click', function() {
+                if (document.querySelectorAll('.question-item').length > 1) {
+                    this.closest('.question-item').remove();
+                } else {
+                    alert('Debe haber al menos una pregunta');
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

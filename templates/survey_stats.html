@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}Estadísticas - {{ survey.title }}{% endblock %}
+
+{% block content %}
+<div class="bg-gradient-to-br from-gray-900 to-blue-900 text-white min-h-screen flex flex-col">
+    <!-- Barra de header -->
+    <div class="bg-blue-600 p-0 fixed top-0 left-0 w-full z-10 header-container">
+        <div class="container mx-auto flex justify-between items-center h-full">
+            <div class="flex items-center space-x-4">
+                <a href="{{ url_for('dashboard') }}" class="flex items-center">
+                    <img src="{{ url_for('static', filename='images/datavox-version-final-blanco.svg') }}" 
+                         alt="DataVox Logo" 
+                         class="h-14">
+                </a>
+                <a href="{{ url_for('view_survey', survey_id=survey.id) }}" 
+                   class="text-white hover:text-gray-200 flex items-center text-sm bg-blue-700/50 px-3 py-1 rounded-lg transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    Volver a Encuesta
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenido principal -->
+    <div class="container mx-auto mt-24 px-4 py-8">
+        <div class="bg-gray-800 rounded-xl shadow-lg p-8">
+            <div class="mb-8 text-center">
+                <h1 class="text-3xl font-bold text-blue-500 mb-2">Estadísticas: {{ survey.title }}</h1>
+                <p class="text-gray-400">{{ survey.description }}</p>
+                <div class="mt-4 bg-blue-900 rounded-lg p-4 max-w-2xl mx-auto">
+                    <div class="flex justify-center items-center space-x-8">
+                        <div class="text-center">
+                            <span class="text-2xl font-bold">{{ response_count }}</span>
+                            <p class="text-sm text-gray-300">Respuestas totales</p>
+                        </div>
+                        <div class="text-center">
+                            <span class="text-2xl font-bold">{{ stats.questions|length }}</span>
+                            <p class="text-sm text-gray-300">Preguntas realizadas</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Gráficas de preguntas -->
+            <div class="space-y-12">
+                {% for question in stats.questions %}
+                <div class="bg-gray-700 p-6 rounded-xl">
+                    <h3 class="text-xl font-semibold mb-4 text-blue-400">Pregunta {{ loop.index }}: {{ question.text }}</h3>
+                    <p class="text-sm text-gray-400 mb-4">
+                        Tipo: 
+                        {% if question.type == 'multiple' %}Opción múltiple
+                        {% elif question.type == 'rating' %}Valoración (1-5)
+                        {% else %}Respuesta abierta{% endif %}
+                    </p>
+                    
+                    {% if question.stats %}
+                    <div class="chart-container" style="position: relative; height:400px; width:100%">
+                        <canvas id="chart-{{ loop.index }}" 
+                                data-labels="{{ question.stats.labels|tojson|forceescape }}"
+                                data-data="{{ question.stats.data|tojson|forceescape }}"
+                                data-type="{{ question.stats.type }}"></canvas>
+                    </div>
+                    
+                    {% if question.type == 'open' %}
+                    <div class="mt-4 text-sm text-gray-300">
+                        <p>Palabras más frecuentes en las respuestas (mínimo 4 letras):</p>
+                    </div>
+                    {% endif %}
+                    {% else %}
+                    <div class="bg-gray-600 p-4 rounded-lg text-center text-gray-300">
+                        No hay suficientes datos para mostrar gráficos
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Configuración para todos los gráficos
+    const chartConfig = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'right',
+                labels: {
+                    color: '#E5E7EB'
+                }
+            },
+            tooltip: {
+                enabled: true,
+                mode: 'index',
+                intersect: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: { color: '#9CA3AF' },
+                grid: { color: 'rgba(156, 163, 175, 0.1)' }
+            },
+            x: {
+                ticks: { color: '#9CA3AF' },
+                grid: { color: 'rgba(156, 163, 175, 0.1)' }
+            }
+        }
+    };
+
+    // Gráficas de preguntas individuales
+    document.querySelectorAll('[id^="chart-"]').forEach(canvas => {
+        const ctx = canvas.getContext('2d');
+        const labels = JSON.parse(canvas.dataset.labels);
+        const data = JSON.parse(canvas.dataset.data);
+        const type = canvas.dataset.type;
+
+        new Chart(ctx, {
+            type: type,
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Respuestas',
+                    data: data,
+                    backgroundColor: [
+                        'rgba(59, 130, 246, 0.7)',
+                        'rgba(99, 102, 241, 0.7)',
+                        'rgba(168, 85, 247, 0.7)',
+                        'rgba(236, 72, 153, 0.7)',
+                        'rgba(239, 68, 68, 0.7)',
+                        'rgba(249, 115, 22, 0.7)',
+                        'rgba(16, 185, 129, 0.7)'
+                    ],
+                    borderColor: [
+                        'rgba(59, 130, 246, 1)',
+                        'rgba(99, 102, 241, 1)',
+                        'rgba(168, 85, 247, 1)',
+                        'rgba(236, 72, 153, 1)',
+                        'rgba(239, 68, 68, 1)',
+                        'rgba(249, 115, 22, 1)',
+                        'rgba(16, 185, 129, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: chartConfig
+        });
+    });
+});
+</script>
+
+<style>
+    .chart-container {
+        background-color: rgba(31, 41, 55, 0.5);
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    canvas {
+        width: 100% !important;
+        height: 100% !important;
+    }
+    .header-container {
+        height: 64px;
+    }
+</style>
+{% endblock %}

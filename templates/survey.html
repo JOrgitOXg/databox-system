@@ -1,0 +1,351 @@
+{% extends "base.html" %}
+
+{% block title %}DataVox - {{ survey.title }}{% endblock %}
+
+{% block content %}
+<div class="bg-gradient-to-br from-gray-900 to-blue-900 text-white min-h-screen flex flex-col">
+    <!-- Barra de header -->
+    <div class="bg-blue-600 p-0 fixed top-0 left-0 w-full z-10 header-container">
+        <div class="container mx-auto flex justify-between items-center h-full">
+            <div class="flex items-center space-x-4">
+                <a href="{{ url_for('dashboard') }}" class="flex items-center">
+                    <img src="{{ url_for('static', filename='images/datavox-version-final-blanco.svg') }}" 
+                         alt="DataVox Logo" 
+                         class="h-14">
+                </a>
+                <a href="{{ url_for('dashboard') }}" 
+                   class="text-white hover:text-gray-200 flex items-center text-sm bg-blue-700/50 px-3 py-1 rounded-lg transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    Dashboard
+                </a>
+            </div>
+            <div class="flex items-center space-x-2">
+                <span class="bg-blue-500 text-white px-3 py-1 rounded-full text-sm flex items-center h-8">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    {{ response_count }} respuestas
+                </span>
+                <div class="flex space-x-2">
+                    <a href="{{ url_for('edit_survey', survey_id=survey.id) }}" 
+                       class="px-3 py-1 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition text-sm flex items-center h-8">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        Editar
+                    </a>
+                    {% if survey.is_public %}
+                    <div class="relative group">
+                        <button 
+                            class="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm flex items-center h-8 share-btn"
+                            data-url="{{ url_for('public_survey', survey_id=survey.id, _external=True) }}"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                            </svg>
+                            Compartir
+                        </button>
+                        <div class="absolute hidden group-hover:block bg-gray-700 p-2 rounded-lg shadow-lg z-10 w-64">
+                            <p class="text-xs text-gray-300 mb-2">Comparte este enlace para que otros respondan:</p>
+                            <div class="flex">
+                                <input 
+                                    type="text" 
+                                    value="{{ url_for('public_survey', survey_id=survey.id, _external=True) }}" 
+                                    class="flex-1 px-2 py-1 bg-gray-600 text-white text-xs rounded-l border border-gray-500 focus:outline-none" 
+                                    id="share-link-{{ survey.id }}"
+                                    readonly
+                                >
+                                <button 
+                                    class="bg-blue-500 text-white px-2 py-1 text-xs rounded-r hover:bg-blue-600 copy-btn h-8"
+                                    data-target="share-link-{{ survey.id }}"
+                                >
+                                    Copiar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    <a href="{{ url_for('survey_stats', survey_id=survey.id) }}" 
+                       class="px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition text-sm flex items-center h-8">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        Ver Estadísticas
+                    </a>
+                    <button 
+                        onclick="confirmDelete('{{ survey.id }}', {{ response_count }})"
+                        class="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm flex items-center h-8"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Eliminar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenido principal -->
+    <div class="container mx-auto mt-24 px-4 py-8">
+        <div class="bg-gray-800 rounded-xl shadow-lg p-8">
+            <div class="mb-8">
+                <h1 class="text-3xl font-bold text-blue-500 mb-2">{{ survey.title }}</h1>
+                <p class="text-gray-400">{{ survey.description }}</p>
+                <div class="flex items-center mt-4 text-sm text-gray-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    Creada el {{ survey.createdAt }}
+                </div>
+            </div>
+            
+            <!-- Formulario de la encuesta -->
+            <form action="{{ url_for('submit_survey', survey_id=survey.id) }}" method="POST" id="survey-form">
+                <div class="border-t border-gray-700 pt-6">
+                    <h2 class="text-xl font-semibold mb-4">Preguntas:</h2>
+                    <ul class="space-y-6">
+                        {% for question in survey.questions %}
+                        <li class="bg-gray-700 p-4 rounded-lg">
+                            <p class="text-white mb-3 font-medium">{{ question.text }}</p>
+                            
+                            {% if question.type == 'open' %}
+                            <textarea 
+                                name="question_{{ loop.index }}" 
+                                class="w-full px-4 py-2 bg-gray-600 text-white border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                rows="3"
+                                required
+                            ></textarea>
+                            
+                            {% elif question.type == 'multiple' %}
+                            <div class="space-y-3 mt-2">
+                                {% for option in question.options %}
+                                <div class="flex items-center cursor-pointer option-container" data-value="{{ option }}">
+                                    <div class="option-radio w-5 h-5 rounded-full border-2 border-gray-400 flex items-center justify-center mr-3 transition-all duration-200">
+                                        <div class="option-dot w-3 h-3 rounded-full bg-transparent transition-all duration-200"></div>
+                                    </div>
+                                    <label class="cursor-pointer text-gray-300 hover:text-white transition-colors">{{ option }}</label>
+                                </div>
+                                {% endfor %}
+                                <input type="hidden" name="question_{{ loop.index }}" value="" required>
+                            </div>
+                            
+                            {% elif question.type == 'rating' %}
+                            <div class="rating-buttons flex space-x-2 mt-2">
+                                {% for i in range(1, 6) %}
+                                <button 
+                                    type="button"
+                                    data-value="{{ i }}"
+                                    class="rating-btn px-4 py-2 bg-gray-600 rounded-lg hover:bg-blue-600 transition h-10"
+                                >
+                                    {{ i }}
+                                </button>
+                                {% endfor %}
+                                <input type="hidden" name="question_{{ loop.index }}" value="" required>
+                            </div>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                
+                <div class="mt-8 flex justify-end">
+                    <button 
+                        type="submit"
+                        class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition duration-300 flex items-center h-10"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                        Enviar Respuestas
+                    </button>
+                </div>
+            </form>
+
+            <!-- Sección de respuestas -->
+            {% if responses %}
+            <div class="mt-12 border-t border-gray-700 pt-6">
+                <h2 class="text-xl font-semibold mb-4">Respuestas ({{ responses|length }})</h2>
+                <div class="space-y-4">
+                    {% for response in responses %}
+                    <div class="bg-gray-700 p-4 rounded-lg">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="font-medium text-blue-400">
+                                {{ response.user_name }}
+                            </span>
+                            <span class="text-xs text-gray-400">
+                                {% if response.submitted_at %}
+                                    {% if response.submitted_at is string %}
+                                        {{ response.submitted_at }}
+                                    {% else %}
+                                        {{ response.submitted_at.strftime('%d/%m/%Y %H:%M:%S') }}
+                                    {% endif %}
+                                {% else %}
+                                    Fecha no disponible
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="space-y-2 mt-2">
+                            {% for answer in response.responses %}
+                            <div>
+                                <p class="text-sm text-gray-300">
+                                    <span class="font-medium">{{ survey.questions[answer.question_number-1].text }}</span>
+                                </p>
+                                <p class="text-white mt-1">
+                                    {{ answer.response }}
+                                </p>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.option-container').forEach(container => {
+            container.addEventListener('click', function() {
+                const value = this.getAttribute('data-value');
+                const questionContainer = this.closest('.space-y-3');
+                const hiddenInput = questionContainer.querySelector('input[type="hidden"]');
+                const radio = this.querySelector('.option-radio');
+                const dot = this.querySelector('.option-dot');
+                const label = this.querySelector('label');
+                
+                const isSelected = radio.classList.contains('border-blue-600');
+                
+                questionContainer.querySelectorAll('.option-container').forEach(opt => {
+                    opt.querySelector('.option-radio').classList.remove('border-blue-600', 'bg-blue-600/10');
+                    opt.querySelector('.option-dot').classList.remove('bg-blue-600');
+                    opt.querySelector('label').classList.remove('text-white');
+                });
+                
+                if (!isSelected) {
+                    radio.classList.add('border-blue-600', 'bg-blue-600/10');
+                    dot.classList.add('bg-blue-600');
+                    label.classList.add('text-white');
+                    hiddenInput.value = value;
+                } else {
+                    hiddenInput.value = '';
+                }
+            });
+        });
+
+        // Manejar los botones de valoración
+        document.querySelectorAll('.rating-buttons').forEach(container => {
+            const buttons = container.querySelectorAll('.rating-btn');
+            const hiddenInput = container.querySelector('input[type="hidden"]');
+            
+            buttons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const value = this.dataset.value;
+                    const isSelected = this.classList.contains('bg-blue-600');
+                    
+                    buttons.forEach(btn => {
+                        btn.classList.remove('bg-blue-600', 'text-white');
+                        btn.classList.add('bg-gray-600');
+                    });
+                    
+                    if (!isSelected) {
+                        this.classList.remove('bg-gray-600');
+                        this.classList.add('bg-blue-600', 'text-white');
+                        hiddenInput.value = value;
+                    } else {
+                        hiddenInput.value = '';
+                    }
+                });
+            });
+        });
+        
+        // Validación del formulario
+        document.getElementById('survey-form').addEventListener('submit', function(e) {
+            // Verificar preguntas de opción múltiple
+            document.querySelectorAll('.space-y-3 input[type="hidden"]').forEach(input => {
+                if (input.value === '') {
+                    e.preventDefault();
+                    alert('Por favor responde todas las preguntas de opción múltiple');
+                    return;
+                }
+            });
+
+            // Verificar preguntas de valoración
+            document.querySelectorAll('.rating-buttons input[type="hidden"]').forEach(input => {
+                if (input.value === '') {
+                    e.preventDefault();
+                    alert('Por favor responde todas las preguntas de valoración');
+                    return;
+                }
+            });
+        });
+
+        // Manejar copiado de enlace
+        document.querySelectorAll('.copy-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const targetId = this.getAttribute('data-target');
+                const input = document.getElementById(targetId);
+                input.select();
+                document.execCommand('copy');
+                
+                // Cambiar texto temporalmente
+                const originalText = this.textContent;
+                this.textContent = '¡Copiado!';
+                setTimeout(() => {
+                    this.textContent = originalText;
+                }, 2000);
+            });
+        });
+    });
+</script>
+
+<style>
+    /* Estilos para los botones circulares personalizados */
+    .option-radio {
+        transition: all 0.2s ease;
+    }
+    .option-radio:hover {
+        border-color: #2563eb;
+        background-color: rgba(37, 99, 235, 0.1);
+    }
+    .option-radio.border-blue-600 {
+        border-color: #2563eb;
+        background-color: rgba(37, 99, 235, 0.1);
+    }
+    .option-dot.bg-blue-600 {
+        background-color: #2563eb;
+    }
+    .option-container:hover .option-radio {
+        border-color: #2563eb;
+    }
+    .option-container:hover label {
+        color: white;
+    }
+
+    /* Estilos para los botones de valoración */
+    .rating-btn {
+        transition: all 0.2s ease;
+        min-width: 40px;
+        text-align: center;
+    }
+    .rating-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        background-color: #2563eb;
+    }
+    .rating-btn.bg-blue-600 {
+        background-color: #2563eb;
+        color: white;
+    }
+
+    /* Estilo para el header consistente */
+    .header-container {
+        height: 64px;
+    }
+</style>
+{% endblock %}

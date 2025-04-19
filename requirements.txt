@@ -1,0 +1,40 @@
+# Flask y dependencias principales
+Flask==2.3.2
+Werkzeug==2.3.7
+Jinja2==3.1.2
+itsdangerous==2.1.2
+click==8.1.3
+
+# Firebase
+firebase-admin==6.2.0
+google-api-core==2.11.1
+google-auth==2.22.0
+google-cloud-core==2.3.3
+google-cloud-firestore==2.11.1
+google-cloud-storage==2.8.0
+google-crc32c==1.5.0
+grpcio==1.56.2
+grpcio-status==1.56.2
+protobuf==4.23.4
+pyasn1==0.5.0
+pyasn1-modules==0.3.0
+cachetools==5.3.1
+
+# Utilidades
+python-dotenv==1.0.0
+six==1.16.0
+requests==2.31.0
+urllib3==2.0.4
+certifi==2023.7.22
+chardet==4.0.0
+idna==3.4
+pytz==2023.3
+
+pip install -r requirements.txt
+
+pip install grpcio==1.56.2 --only-binary=:all: #SI FALLA TODA LA INSTALACION ANTERIOR PRIMERO INSTALAR ESTO
+
+pip install --upgrade --force-reinstall -r requirements.txt # Reinstala todas las dependencias para asegurarse de que estén actualizadas y en la versión correcta
+
+pip uninstall protobuf # Desinstala protobuf si ya está instalado
+pip install protobuf==4.23.4 # Instala la versión específica de protobuf
