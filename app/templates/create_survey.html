@@ -6,7 +6,7 @@
 <div class="bg-gradient-to-br from-gray-900 to-blue-900 text-white min-h-screen flex items-center justify-center p-4">
     <div class="bg-gray-800 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden border border-gray-700 p-8">
         <div class="text-center mb-8">
-            <a href="{{ url_for('dashboard') }}" class="inline-block mb-4">
+            <a href="{{ url_for('survey.dashboard') }}" class="inline-block mb-4">
                 <img src="{{ url_for('static', filename='images/datavox-version-final-azul.svg') }}" 
                      alt="DataVox Logo" 
                      class="h-24 mx-auto">
@@ -17,7 +17,7 @@
             <p class="text-gray-400">Diseña tu encuesta personalizada</p>
         </div>
 
-        <form method="POST" action="{{ url_for('edit_survey', survey_id=survey.id) if survey else url_for('create_survey') }}">            <div>
+        <form method="POST" action="{{ url_for('survey.edit_survey', survey_id=survey.id) if survey else url_for('survey.create_survey') }}">            <div>
                 <label for="title" class="block text-gray-300 mb-2">Título de la encuesta</label>
                 <input 
                     type="text"
@@ -137,7 +137,7 @@
 
             <div class="flex justify-end space-x-4 pt-4">
                 <a 
-                href="{{ url_for('view_survey', survey_id=survey.id) if survey else url_for('dashboard') }}"
+                href="{{ url_for('survey.view_survey', survey_id=survey.id) if survey else url_for('survey.dashboard') }}"
                 class="px-6 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-700 transition"
             >
                 Cancelar
